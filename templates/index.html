@@ -694,7 +694,15 @@ document.getElementById("months-clear").onclick = () => {
 };
 
 // Back to homepage
-document.getElementById("btn-back-home").onclick = () => { showView("home"); renderHomepage(); };
+document.getElementById("btn-back-home").onclick = () => {
+  if (state.wizardFrom === "visualiser") {
+    state.wizardFrom = null;
+    showView("visualiser");
+  } else {
+    showView("home");
+    renderHomepage();
+  }
+};
 
 // Ingest button
 document.getElementById("btn-ingest").onclick = () => {
@@ -804,6 +812,7 @@ document.getElementById("y-axis-cap").addEventListener("change", fetchFigure);
 // Edit selection: go back to wizard with current scanData and restore current selections
 document.getElementById("btn-edit-selection").onclick = () => {
   if (!state.scanData) return;
+  state.wizardFrom = "visualiser";
   const entry = getMemory().find(e => e.filename === state.currentFile);
   showWizardWithRestore(state.scanData, entry);
 };
