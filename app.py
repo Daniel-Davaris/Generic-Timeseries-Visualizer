@@ -280,4 +280,7 @@ def figure():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os as _os
+    debug = _os.environ.get("FLASK_DEBUG", "1") == "1"
+    port = int(_os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=debug)
