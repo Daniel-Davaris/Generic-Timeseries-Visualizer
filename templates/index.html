@@ -76,6 +76,13 @@
                          color: var(--text-secondary); transition: background 0.1s; }
     .select-list label:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .select-list input[type=checkbox] { margin-right: 8px; accent-color: var(--accent); }
+    /* Date tree hierarchy */
+    .date-tree details { margin: 0; }
+    .date-tree summary { display: flex; align-items: center; padding: 4px 8px; font-size: 0.8rem;
+                         cursor: pointer; border-radius: 3px; color: var(--text-secondary); font-weight: 600; }
+    .date-tree summary:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .date-tree summary input[type=checkbox] { margin-right: 8px; accent-color: var(--accent); }
+    .date-tree .month-items { padding-left: 22px; }
 
     /* Config row */
     .config-row { margin-top: 16px; }
@@ -482,10 +489,17 @@ function showWizardWithRestore(data, entry) {
       cb.checked = colSet.has(cb.value);
     });
     const monthSet = new Set(entry.months || []);
-    document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => {
+    document.querySelectorAll("#month-list .month-items input[type=checkbox]").forEach(cb => {
       cb.checked = monthSet.has(cb.value);
     });
-    if (entry.eventCols) {}
+    // Update year checkbox states
+    document.querySelectorAll("#month-list details").forEach(det => {
+      const yearCb = det.querySelector("summary input");
+      const monthCbs = det.querySelectorAll(".month-items input");
+      const checked = [...monthCbs].filter(c => c.checked).length;
+      yearCb.checked = checked === monthCbs.length;
+      yearCb.indeterminate = checked > 0 && checked < monthCbs.length;
+    });
   }
   updatePreview();
 }
@@ -549,16 +563,56 @@ function buildColumnList(columns) {
 
 function buildMonthList(months) {
   const list = document.getElementById("month-list");
-  const frag = document.createDocumentFragment();
-  months.forEach(m => {
-    const lbl = document.createElement("label");
-    const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.value = m; cb.checked = false;
-    cb.addEventListener("change", updatePreview);
-    lbl.append(cb, " " + m);
-    frag.appendChild(lbl);
-  });
   list.innerHTML = "";
+  list.classList.add("date-tree");
+
+  // Group months by year
+  const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const yearMap = {};
+  months.forEach(m => {
+    const [year, mo] = m.split("-");
+    if (!yearMap[year]) yearMap[year] = [];
+    yearMap[year].push({ value: m, label: MONTH_NAMES[parseInt(mo) - 1] });
+  });
+
+  const frag = document.createDocumentFragment();
+  Object.keys(yearMap).sort().forEach(year => {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const yearCb = document.createElement("input");
+    yearCb.type = "checkbox"; yearCb.dataset.year = year;
+    summary.append(yearCb, " " + year);
+    details.appendChild(summary);
+
+    const monthDiv = document.createElement("div");
+    monthDiv.className = "month-items";
+
+    yearMap[year].forEach(mo => {
+      const lbl = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.value = mo.value; cb.checked = false;
+      cb.addEventListener("change", () => {
+        // Update year checkbox state
+        const siblings = monthDiv.querySelectorAll("input[type=checkbox]");
+        const checked = [...siblings].filter(c => c.checked).length;
+        yearCb.checked = checked === siblings.length;
+        yearCb.indeterminate = checked > 0 && checked < siblings.length;
+        updatePreview();
+      });
+      lbl.append(cb, " " + mo.label);
+      monthDiv.appendChild(lbl);
+    });
+
+    // Year checkbox toggles all months in that year
+    yearCb.addEventListener("change", () => {
+      monthDiv.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = yearCb.checked);
+      yearCb.indeterminate = false;
+      updatePreview();
+    });
+
+    details.appendChild(monthDiv);
+    frag.appendChild(details);
+  });
   list.appendChild(frag);
 }
 
@@ -567,7 +621,7 @@ function updatePreview() {
   const preview = state.scanData.preview;
   const dateCol = state.scanData.date_col;
   const selectedCols = new Set([...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value));
-  const selectedMonths = new Set([...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value));
+  const selectedMonths = new Set([...document.querySelectorAll("#month-list .month-items input:checked")].map(cb => cb.value));
   selectedCols.add(dateCol);
 
   const colIndices = [];
@@ -608,11 +662,11 @@ document.getElementById("cols-clear").onclick = () => {
   updatePreview();
 };
 document.getElementById("months-select-all").onclick = () => {
-  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = true);
+  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => { cb.checked = true; cb.indeterminate = false; });
   updatePreview();
 };
 document.getElementById("months-clear").onclick = () => {
-  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = false);
+  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => { cb.checked = false; cb.indeterminate = false; });
   updatePreview();
 };
 
@@ -622,7 +676,7 @@ document.getElementById("btn-back-home").onclick = () => { showView("home"); ren
 // Ingest button
 document.getElementById("btn-ingest").onclick = () => {
   const selectedCols = [...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value);
-  const selectedMonths = [...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value);
+  const selectedMonths = [...document.querySelectorAll("#month-list .month-items input:checked")].map(cb => cb.value);
   const eventCols = "";
 
   if (selectedCols.length === 0) { alert("Please select at least one column."); return; }
