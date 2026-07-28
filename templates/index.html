@@ -745,6 +745,7 @@ function buildSidebar(groups) {
   for (const [group, cols] of Object.entries(groups)) {
     const details = document.createElement("details");
     details.className = "col-group";
+    details.open = true;
     const summary = document.createElement("summary");
     summary.textContent = group;
     details.appendChild(summary);
