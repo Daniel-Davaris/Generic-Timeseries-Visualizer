@@ -122,6 +122,24 @@
                               cursor: pointer; padding: 2px 6px; border-radius: 3px; }
     .recent-item .ri-delete:hover { background: rgba(248,81,73,0.15); color: #f85149; }
 
+    /* Homepage */
+    .homepage-files { margin-bottom: 20px; }
+    .homepage-files h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary);
+                         text-transform: uppercase; letter-spacing: 0.5px; }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .file-card { padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border);
+                 border-radius: 8px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
+    .file-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .file-card .fc-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;
+                          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-card .fc-meta { font-size: 0.72rem; color: var(--text-muted); line-height: 1.5; }
+    .file-card .fc-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .file-card .fc-actions button { font-size: 0.7rem; padding: 3px 8px; border: 1px solid var(--border);
+                                    border-radius: 3px; background: var(--bg-tertiary); color: var(--text-muted);
+                                    cursor: pointer; }
+    .file-card .fc-actions button:hover { border-color: var(--accent); color: var(--accent); }
+    .file-card .fc-actions .fc-del:hover { border-color: #f85149; color: #f85149; }
+
     /* Toolbar */
     .toolbar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
                padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border);
@@ -192,18 +210,11 @@
     <p id="loading-text">Uploading and processing file…</p>
   </div>
 
-  <!-- ═══ WIZARD ═══ -->
-  <div class="wizard" id="wizard">
-
-    <!-- Recent sessions (memory) -->
-    <div class="recent-sessions hidden" id="recent-sessions">
-      <h3>📁 Recent sessions</h3>
-      <div class="recent-list" id="recent-list"></div>
-    </div>
-
-    <!-- Step 1: Upload -->
+  <!-- ═══ HOMEPAGE ═══ -->
+  <div id="homepage">
+    <div class="homepage-files" id="homepage-files"></div>
     <div class="wizard-step" id="step-upload">
-      <h2><span class="step-num">1</span> Upload data file</h2>
+      <h2><span class="step-num">+</span> Upload new file</h2>
       <div class="upload-area" id="upload-area">
         <label for="csv-file">
           <strong>Click to upload</strong> or drag &amp; drop a data file<br>
@@ -211,16 +222,13 @@
         </label>
         <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls">
       </div>
-      <div class="upload-success hidden" id="upload-success">
-        <span>✓</span>
-        <span class="file-info" id="upload-file-info"></span>
-        <button class="btn" id="btn-change-file" style="margin-left:auto;font-size:.75rem;">Change file</button>
-      </div>
     </div>
+  </div>
 
-    <!-- Step 2: Select columns & date periods -->
-    <div class="wizard-step disabled" id="step-select">
-      <h2><span class="step-num">2</span> Select columns &amp; date range to ingest</h2>
+  <!-- ═══ WIZARD (column/month selection) ═══ -->
+  <div class="wizard hidden" id="wizard">
+    <div class="wizard-step" id="step-select">
+      <h2><span class="step-num">⚙</span> Select columns &amp; date range</h2>
 
       <div class="select-panels">
         <div class="select-panel">
@@ -252,6 +260,7 @@
       </div>
 
       <div class="wizard-actions">
+        <button class="btn" id="btn-back-home">← Back</button>
         <button class="btn-go" id="btn-ingest">Load selected data →</button>
       </div>
     </div>
@@ -265,8 +274,8 @@
     <button id="btn-normalise">Show normalised</button>
     <button id="btn-apply" class="primary">⚡ Apply selection</button>
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
-    <span id="file-label" style="margin-left:auto;font-size:.8rem;color:var(--text-muted)"></span>
-    <button id="btn-new-file" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">↩ New file</button>
+    <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
+    <button id="btn-home" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">🏠 Home</button>
   </div>
 
   <div class="main hidden" id="main-area">
@@ -287,7 +296,36 @@ const DARK_PLOTLY_LAYOUT = {
   yaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
 };
 
-const state = { period: "Yearly", normalised: false, groups: null, scanData: null };
+const state = { period: "Yearly", normalised: false, groups: null, scanData: null, currentFile: null };
+
+// ── IndexedDB for file blob caching ─────────────────────────────────
+const DB_NAME = "signal_analyser_files";
+const DB_VERSION = 1;
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => req.result.createObjectStore("files", { keyPath: "name" });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function storeFile(name, blob) {
+  const db = await openDB();
+  const tx = db.transaction("files", "readwrite");
+  tx.objectStore("files").put({ name, blob, storedAt: Date.now() });
+  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+}
+async function getFile(name) {
+  const db = await openDB();
+  const tx = db.transaction("files", "readonly");
+  const req = tx.objectStore("files").get(name);
+  return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = rej; });
+}
+async function deleteFile(name) {
+  const db = await openDB();
+  const tx = db.transaction("files", "readwrite");
+  tx.objectStore("files").delete(name);
+}
 
 // ── Memory (localStorage) ───────────────────────────────────────────
 const MEMORY_KEY = "signal_analyser_sessions";
@@ -296,11 +334,10 @@ function getMemory() {
   catch { return []; }
 }
 function saveMemory(entries) {
-  localStorage.setItem(MEMORY_KEY, JSON.stringify(entries.slice(0, 20))); // Keep last 20
+  localStorage.setItem(MEMORY_KEY, JSON.stringify(entries.slice(0, 20)));
 }
 function saveSession(filename, config) {
   const entries = getMemory();
-  // Remove duplicate for same filename
   const filtered = entries.filter(e => e.filename !== filename);
   filtered.unshift({
     filename,
@@ -310,41 +347,6 @@ function saveSession(filename, config) {
     savedAt: new Date().toISOString(),
   });
   saveMemory(filtered);
-  renderRecentSessions();
-}
-function renderRecentSessions() {
-  const entries = getMemory();
-  const container = document.getElementById("recent-sessions");
-  const list = document.getElementById("recent-list");
-  if (entries.length === 0) { container.classList.add("hidden"); return; }
-  container.classList.remove("hidden");
-  list.innerHTML = "";
-  entries.forEach((entry, idx) => {
-    const div = document.createElement("div");
-    div.className = "recent-item";
-    const ago = timeAgo(entry.savedAt);
-    const colCount = entry.columns ? entry.columns.length : 0;
-    const monthCount = entry.months ? entry.months.length : 0;
-    div.innerHTML = `
-      <div>
-        <div class="ri-name">${entry.filename}</div>
-        <div class="ri-meta">${colCount} cols · ${monthCount} months · ${ago}</div>
-      </div>
-      <span class="ri-delete" data-idx="${idx}" title="Remove">✕</span>
-    `;
-    div.addEventListener("click", (e) => {
-      if (e.target.classList.contains("ri-delete")) return;
-      loadFromMemory(entry);
-    });
-    div.querySelector(".ri-delete").addEventListener("click", (e) => {
-      e.stopPropagation();
-      const mem = getMemory();
-      mem.splice(idx, 1);
-      saveMemory(mem);
-      renderRecentSessions();
-    });
-    list.appendChild(div);
-  });
 }
 function timeAgo(isoStr) {
   const diff = Date.now() - new Date(isoStr).getTime();
@@ -356,42 +358,112 @@ function timeAgo(isoStr) {
   const days = Math.floor(hrs / 24);
   return days + "d ago";
 }
-function loadFromMemory(entry) {
-  // Restore the saved config into state so after upload we can re-apply selections
-  state.memoryRestore = entry;
-  // Prompt user to re-upload the same file
-  alert(`Please upload "${entry.filename}" again.\nYour previous column & date selections will be restored automatically.`);
-}
-function applyMemoryRestore() {
-  // After upload, if we have a memory restore pending, apply the selections
-  const restore = state.memoryRestore;
-  if (!restore) return false;
-  state.memoryRestore = null;
 
-  // Apply column selections
-  const colSet = new Set(restore.columns || []);
-  document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => {
-    cb.checked = colSet.has(cb.value);
-  });
-  // Apply month selections
-  const monthSet = new Set(restore.months || []);
-  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => {
-    cb.checked = monthSet.has(cb.value);
-  });
-  // Apply event cols
-  if (restore.eventCols) {
-    document.getElementById("event-cols").value = restore.eventCols;
-  }
-  updatePreview();
-  return true;
+// ── Navigation helpers ──────────────────────────────────────────────
+function showView(view) {
+  document.getElementById("homepage").classList.toggle("hidden", view !== "home");
+  document.getElementById("wizard").classList.toggle("hidden", view !== "wizard");
+  document.getElementById("toolbar").classList.toggle("hidden", view !== "visualiser");
+  document.getElementById("main-area").classList.toggle("hidden", view !== "visualiser");
 }
-// Render on page load
-renderRecentSessions();
 
 function showLoading(msg) { document.getElementById("loading-text").textContent = msg; document.getElementById("loading").classList.add("visible"); }
 function hideLoading() { document.getElementById("loading").classList.remove("visible"); }
 
-// ── Wizard Step 1: Upload ───────────────────────────────────────────
+// ── Homepage ────────────────────────────────────────────────────────
+function renderHomepage() {
+  const entries = getMemory();
+  const container = document.getElementById("homepage-files");
+  if (entries.length === 0) { container.innerHTML = ""; return; }
+  let html = '<h3>📁 Your files</h3><div class="file-grid">';
+  entries.forEach((entry, idx) => {
+    const colCount = entry.columns ? entry.columns.length : 0;
+    const monthCount = entry.months ? entry.months.length : 0;
+    html += `
+      <div class="file-card" data-idx="${idx}">
+        <div class="fc-name">${entry.filename}</div>
+        <div class="fc-meta">
+          ${colCount} columns · ${monthCount} months<br>
+          Last used ${timeAgo(entry.savedAt)}
+        </div>
+        <div class="fc-actions">
+          <button class="fc-del" data-idx="${idx}">Delete</button>
+        </div>
+      </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Event listeners
+  container.querySelectorAll(".file-card").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target.classList.contains("fc-del")) return;
+      openSavedFile(entries[parseInt(card.dataset.idx)]);
+    });
+  });
+  container.querySelectorAll(".fc-del").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      const entry = entries[idx];
+      deleteFile(entry.filename);
+      const mem = getMemory();
+      mem.splice(idx, 1);
+      saveMemory(mem);
+      renderHomepage();
+    });
+  });
+}
+
+async function openSavedFile(entry) {
+  // Try to load file from IndexedDB cache
+  const cached = await getFile(entry.filename);
+  if (!cached) {
+    alert(`File "${entry.filename}" is no longer cached.\nPlease re-upload it.`);
+    state.pendingRestore = entry;
+    return;
+  }
+  state.pendingRestore = entry;
+  state.currentFile = entry.filename;
+  // Auto-upload from cache
+  showLoading("Loading " + entry.filename + "…");
+  const fd = new FormData();
+  fd.append("file", cached.blob, entry.filename);
+
+  try {
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await r.json();
+    hideLoading();
+    if (data.error) { alert(data.error); return; }
+    state.scanData = data;
+    showWizardWithRestore(data, entry);
+  } catch (err) {
+    hideLoading();
+    alert("Failed to load file: " + err);
+  }
+}
+
+function showWizardWithRestore(data, entry) {
+  showView("wizard");
+  buildColumnList(data.columns);
+  buildMonthList(data.months);
+
+  // Restore saved selections
+  if (entry) {
+    const colSet = new Set(entry.columns || []);
+    document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => {
+      cb.checked = colSet.has(cb.value);
+    });
+    const monthSet = new Set(entry.months || []);
+    document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => {
+      cb.checked = monthSet.has(cb.value);
+    });
+    if (entry.eventCols) document.getElementById("event-cols").value = entry.eventCols;
+  }
+  updatePreview();
+}
+
+// ── Upload (new file) ───────────────────────────────────────────────
 const uploadArea = document.getElementById("upload-area");
 const csvInput = document.getElementById("csv-file");
 
@@ -404,45 +476,38 @@ uploadArea.addEventListener("drop", e => {
 });
 csvInput.addEventListener("change", handleUpload);
 
-document.getElementById("btn-change-file").onclick = () => {
-  uploadArea.classList.remove("hidden");
-  document.getElementById("upload-success").classList.add("hidden");
-  document.getElementById("step-select").classList.add("disabled");
-  csvInput.value = "";
-};
-
-function handleUpload() {
+async function handleUpload() {
   const file = csvInput.files[0];
   if (!file) return;
+  state.currentFile = file.name;
   showLoading("Scanning file…");
+
+  // Cache file blob in IndexedDB
+  await storeFile(file.name, file);
+
   const fd = new FormData();
   fd.append("file", file);
 
-  fetch("/api/upload", { method: "POST", body: fd })
-    .then(r => r.json())
-    .then(data => {
-      hideLoading();
-      if (data.error) { alert(data.error); return; }
-      state.scanData = data;
+  try {
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await r.json();
+    hideLoading();
+    if (data.error) { alert(data.error); return; }
+    state.scanData = data;
 
-      uploadArea.classList.add("hidden");
-      document.getElementById("upload-success").classList.remove("hidden");
-      document.getElementById("upload-file-info").textContent =
-        `${file.name} — ${data.row_count.toLocaleString()} rows × ${data.col_count} columns`;
-
-      document.getElementById("step-select").classList.remove("disabled");
-      buildColumnList(data.columns);
-      buildMonthList(data.months);
-      applyMemoryRestore(); // Restore saved selections if loading from memory
-      buildPreviewTable(data.preview);
-    })
-    .catch(err => { hideLoading(); alert("Upload failed: " + err); });
+    // If we have a pending restore (clicked a saved file but it wasn't cached)
+    const restore = state.pendingRestore;
+    state.pendingRestore = null;
+    showWizardWithRestore(data, restore);
+  } catch (err) {
+    hideLoading();
+    alert("Upload failed: " + err);
+  }
 }
 
-// ── Wizard Step 2: Column & Month selection ─────────────────────────
+// ── Wizard: Column & Month selection ────────────────────────────────
 function buildColumnList(columns) {
   const list = document.getElementById("col-list");
-  // Use DocumentFragment for fast DOM insertion
   const frag = document.createDocumentFragment();
   columns.forEach(col => {
     const lbl = document.createElement("label");
@@ -462,7 +527,7 @@ function buildMonthList(months) {
   months.forEach(m => {
     const lbl = document.createElement("label");
     const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.value = m; cb.checked = false; // Unticked by default
+    cb.type = "checkbox"; cb.value = m; cb.checked = false;
     cb.addEventListener("change", updatePreview);
     lbl.append(cb, " " + m);
     frag.appendChild(lbl);
@@ -474,32 +539,27 @@ function buildMonthList(months) {
 function updatePreview() {
   if (!state.scanData) return;
   const preview = state.scanData.preview;
-  const dateCcol = state.scanData.date_col;
+  const dateCol = state.scanData.date_col;
   const selectedCols = new Set([...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value));
   const selectedMonths = new Set([...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value));
-  selectedCols.add(dateCcol); // Always show date col
+  selectedCols.add(dateCol);
 
-  // Filter columns
   const colIndices = [];
   const filteredCols = [];
   preview.columns.forEach((col, i) => {
     if (selectedCols.has(col)) { colIndices.push(i); filteredCols.push(col); }
   });
 
-  // Filter rows by selected months
-  const dateIdx = preview.columns.indexOf(dateCcol);
+  const dateIdx = preview.columns.indexOf(dateCol);
   let filteredRows = preview.data;
   if (selectedMonths.size > 0 && dateIdx >= 0) {
     filteredRows = preview.data.filter(row => {
       const d = row[dateIdx];
       if (!d) return false;
-      // Match YYYY-MM format
-      const m = String(d).substring(0, 7);
-      return selectedMonths.has(m);
+      return selectedMonths.has(String(d).substring(0, 7));
     });
   }
 
-  // Render filtered preview
   const table = document.getElementById("preview-table");
   const html = ['<thead><tr>'];
   filteredCols.forEach(col => html.push(`<th>${col}</th>`));
@@ -511,10 +571,6 @@ function updatePreview() {
   });
   html.push('</tbody>');
   table.innerHTML = html.join('');
-}
-
-function buildPreviewTable(preview) {
-  updatePreview();
 }
 
 document.getElementById("cols-select-all").onclick = () => {
@@ -533,6 +589,9 @@ document.getElementById("months-clear").onclick = () => {
   document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = false);
   updatePreview();
 };
+
+// Back to homepage
+document.getElementById("btn-back-home").onclick = () => { showView("home"); renderHomepage(); };
 
 // Ingest button
 document.getElementById("btn-ingest").onclick = () => {
@@ -556,16 +615,11 @@ document.getElementById("btn-ingest").onclick = () => {
       state.groups = data.groups;
 
       // Save to memory
-      const filename = document.getElementById("upload-file-info").textContent.split("—")[0].trim();
-      saveSession(filename, { columns: selectedCols, months: selectedMonths, eventCols });
+      saveSession(state.currentFile, { columns: selectedCols, months: selectedMonths, eventCols });
 
       document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows`;
-      document.getElementById("file-label").textContent = document.getElementById("upload-file-info").textContent;
       buildSidebar(data.groups);
-
-      document.getElementById("wizard").classList.add("hidden");
-      document.getElementById("toolbar").classList.remove("hidden");
-      document.getElementById("main-area").classList.remove("hidden");
+      showView("visualiser");
     })
     .catch(err => { hideLoading(); alert("Ingest failed: " + err); });
 };
@@ -633,16 +687,15 @@ document.getElementById("btn-normalise").onclick = function () {
 
 document.getElementById("btn-apply").onclick = () => fetchFigure();
 
-document.getElementById("btn-new-file").onclick = () => {
-  document.getElementById("wizard").classList.remove("hidden");
-  document.getElementById("toolbar").classList.add("hidden");
-  document.getElementById("main-area").classList.add("hidden");
-  uploadArea.classList.remove("hidden");
-  document.getElementById("upload-success").classList.add("hidden");
-  document.getElementById("step-select").classList.add("disabled");
-  csvInput.value = "";
-  state.scanData = null;
+// Edit selection: go back to wizard with current scanData and restore current selections
+document.getElementById("btn-edit-selection").onclick = () => {
+  if (!state.scanData) return;
+  const entry = getMemory().find(e => e.filename === state.currentFile);
+  showWizardWithRestore(state.scanData, entry);
 };
+
+// Home button
+document.getElementById("btn-home").onclick = () => { showView("home"); renderHomepage(); };
 
 // ── Fetch figure ────────────────────────────────────────────────────
 function getSelectedCols() {
@@ -661,13 +714,11 @@ function fetchFigure() {
     .then(fig => {
       hideLoading();
       if (fig.error) { alert(fig.error); return; }
-      // Apply dark theme to all axes
       const layout = Object.assign({}, fig.layout, {
         paper_bgcolor: DARK_PLOTLY_LAYOUT.paper_bgcolor,
         plot_bgcolor: DARK_PLOTLY_LAYOUT.plot_bgcolor,
         font: DARK_PLOTLY_LAYOUT.font,
       });
-      // Style all x/y axes
       for (const key of Object.keys(layout)) {
         if (key.startsWith("xaxis") || key.startsWith("yaxis")) {
           layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d', zerolinecolor: '#30363d',
@@ -683,6 +734,10 @@ function fetchFigure() {
     })
     .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
 }
+
+// ── Init ────────────────────────────────────────────────────────────
+renderHomepage();
+showView("home");
 </script>
 </body>
 </html>
