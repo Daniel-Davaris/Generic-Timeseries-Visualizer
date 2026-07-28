@@ -843,8 +843,15 @@ function fetchFigure() {
         font: DARK_PLOTLY_LAYOUT.font,
       });
       for (const key of Object.keys(layout)) {
-        if (key.startsWith("xaxis") || key.startsWith("yaxis")) {
+        if (key.startsWith("xaxis")) {
           layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d', zerolinecolor: '#30363d',
+                                                          tickfont: { color: '#8b949e', size: 10 } });
+          if (layout[key].title) layout[key].title.font = { color: '#8b949e', size: 12 };
+        }
+        if (key.startsWith("yaxis")) {
+          layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d',
+                                                          zerolinecolor: '#e74c3c', zerolinewidth: 1.5,
+                                                          zeroline: true,
                                                           tickfont: { color: '#8b949e', size: 10 } });
           if (layout[key].title) layout[key].title.font = { color: '#8b949e', size: 12 };
         }
@@ -860,6 +867,20 @@ function fetchFigure() {
           }
         }
       }
+
+      // Add red dashed zero lines for each subplot
+      const shapes = layout.shapes ? [...layout.shapes] : [];
+      for (const key of Object.keys(layout)) {
+        if (key.startsWith("yaxis")) {
+          const idx = key === "yaxis" ? "" : key.replace("yaxis", "");
+          shapes.push({
+            type: "line", xref: "x" + idx + " domain", yref: key.replace("axis", ""),
+            x0: 0, x1: 1, y0: 0, y1: 0,
+            line: { color: "#e74c3c", width: 1, dash: "dot" },
+          });
+        }
+      }
+      layout.shapes = shapes;
 
       const chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
