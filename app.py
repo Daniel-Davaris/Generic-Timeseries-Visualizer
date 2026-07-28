@@ -19,11 +19,26 @@ PLOTLY_COLORS = [
 ]
 
 
-def _load_csv(path):
-    df = pd.read_csv(path)
+ALLOWED_EXTENSIONS = {".csv", ".parquet", ".parq", ".xlsx", ".xls"}
+
+
+def _load_file(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".csv":
+        df = pd.read_csv(path)
+    elif ext in (".parquet", ".parq"):
+        df = pd.read_parquet(path)
+    elif ext in (".xlsx", ".xls"):
+        df = pd.read_excel(path)
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+
     date_col = None
     for col in df.columns:
-        if "date" in col.lower():
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            date_col = col
+            break
+        if "date" in col.lower() or "time" in col.lower():
             try:
                 df[col] = pd.to_datetime(df[col])
                 date_col = col
@@ -31,7 +46,7 @@ def _load_csv(path):
             except Exception:
                 continue
     if date_col is None:
-        raise ValueError("No date column found in CSV")
+        raise ValueError("No date/time column found in file")
     df = df.sort_values(date_col)
     return df, date_col
 
@@ -237,15 +252,19 @@ def index():
 @app.route("/api/upload", methods=["POST"])
 def upload():
     file = request.files.get("file")
-    if not file or not file.filename.endswith(".csv"):
-        return jsonify(error="Please upload a .csv file"), 400
+    if not file:
+        return jsonify(error="No file provided"), 400
 
     filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return jsonify(error=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"), 400
+
     path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(path)
 
     try:
-        df, date_col = _load_csv(path)
+        df, date_col = _load_file(path)
     except Exception as exc:
         return jsonify(error=str(exc)), 400
 

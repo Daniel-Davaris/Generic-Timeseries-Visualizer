@@ -52,10 +52,10 @@
   <!-- Upload -->
   <div class="upload-area" id="upload-area">
     <label for="csv-file">
-      <strong>Click to upload</strong> or drag &amp; drop a CSV file<br>
-      <small>The file must contain a date column</small>
+      <strong>Click to upload</strong> or drag &amp; drop a data file<br>
+      <small>Supports CSV, Parquet, and Excel (.xlsx/.xls) — must contain a date column</small>
     </label>
-    <input type="file" id="csv-file" accept=".csv">
+    <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls">
     <div id="event-cols-row">
       <label for="event-cols">Event columns <small>(comma-separated, optional)</small>:</label>
       <input type="text" id="event-cols" placeholder="e.g. input_ToU_label, input_Trade_signal, window">
