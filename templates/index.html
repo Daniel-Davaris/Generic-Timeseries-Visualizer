@@ -595,7 +595,7 @@ function buildMonthList(months) {
   });
 
   const frag = document.createDocumentFragment();
-  Object.keys(yearMap).sort().forEach(year => {
+  Object.keys(yearMap).sort().reverse().forEach(year => {
     const details = document.createElement("details");
     const summary = document.createElement("summary");
     const yearCb = document.createElement("input");
