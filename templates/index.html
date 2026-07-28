@@ -458,19 +458,38 @@ async function openSavedFile(entry) {
     state.pendingRestore = entry;
     return;
   }
-  state.pendingRestore = entry;
   state.currentFile = entry.filename;
   showLoading("Loading " + entry.filename + "…");
   const fd = new FormData();
   fd.append("file", cached.blob, entry.filename);
 
   try {
+    // Step 1: Upload
     const data = await uploadWithProgress(fd);
+    if (data.error) { hideLoading(); alert(data.error); return; }
+    state.scanData = data;
+    setProgress(80);
+
+    // Step 2: Auto-ingest with saved selections
+    document.getElementById("loading-text").textContent = "Applying saved selections…";
+    const r = await fetch("/api/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        columns: entry.columns || [],
+        months: entry.months || [],
+        event_cols: "",
+      }),
+    });
+    const ingestData = await r.json();
     setProgress(100);
     hideLoading();
-    if (data.error) { alert(data.error); return; }
-    state.scanData = data;
-    showWizardWithRestore(data, entry);
+    if (ingestData.error) { alert(ingestData.error); return; }
+
+    state.groups = ingestData.groups;
+    document.getElementById("row-count").textContent = `${ingestData.row_count.toLocaleString()} rows`;
+    buildSidebar(ingestData.groups);
+    showView("visualiser");
   } catch (err) {
     hideLoading();
     alert("Failed to load file: " + err);
