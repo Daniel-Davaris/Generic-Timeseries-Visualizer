@@ -351,6 +351,7 @@ function saveSession(filename, config) {
   const filtered = entries.filter(e => e.filename !== filename);
   filtered.unshift({
     filename,
+    sid: config.sid || null,
     columns: config.columns,
     months: config.months,
     eventCols: config.eventCols || "",
@@ -455,26 +456,64 @@ function renderHomepage() {
 }
 
 async function openSavedFile(entry) {
-  const cached = await getFile(entry.filename);
-  if (!cached) {
-    alert(`File "${entry.filename}" is no longer cached.\nPlease re-upload it.`);
-    state.pendingRestore = entry;
-    return;
-  }
   state.currentFile = entry.filename;
   showLoading("Loading " + entry.filename + "…");
-  const fd = new FormData();
-  fd.append("file", cached.blob, entry.filename);
 
   try {
-    // Step 1: Upload
+    // Fast path: check if server still has the data cached
+    if (entry.sid) {
+      const checkR = await fetch("/api/check-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sid: entry.sid }),
+      });
+      const checkData = await checkR.json();
+      if (checkData.cached) {
+        setProgress(50);
+        state.scanData = checkData;
+        // Skip upload, go straight to ingest
+        document.getElementById("loading-text").textContent = "Applying selections…";
+        const r = await fetch("/api/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sid: entry.sid,
+            columns: entry.columns || [],
+            months: entry.months || [],
+            event_cols: "",
+          }),
+        });
+        const ingestData = await r.json();
+        setProgress(100);
+        hideLoading();
+        if (ingestData.error) { alert(ingestData.error); return; }
+        state.groups = ingestData.groups;
+        document.getElementById("row-count").textContent = `${ingestData.row_count.toLocaleString()} rows`;
+        buildSidebar(ingestData.groups);
+        showView("visualiser");
+        return;
+      }
+    }
+
+    // Slow path: re-upload from IndexedDB
+    const cached = await getFile(entry.filename);
+    if (!cached) {
+      hideLoading();
+      alert(`File "${entry.filename}" is no longer cached.\nPlease re-upload it.`);
+      state.pendingRestore = entry;
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", cached.blob, entry.filename);
     const data = await uploadWithProgress(fd);
     if (data.error) { hideLoading(); alert(data.error); return; }
     state.scanData = data;
+    // Update stored sid for next time
+    entry.sid = data.sid;
+    saveSession(entry.filename, entry);
     setProgress(80);
 
-    // Step 2: Auto-ingest with saved selections
-    document.getElementById("loading-text").textContent = "Applying saved selections…";
+    document.getElementById("loading-text").textContent = "Applying selections…";
     const r = await fetch("/api/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -497,6 +536,8 @@ async function openSavedFile(entry) {
   } catch (err) {
     hideLoading();
     alert("Failed to load file: " + err);
+  }
+}
   }
 }
 
@@ -726,7 +767,7 @@ document.getElementById("btn-ingest").onclick = () => {
       state.groups = data.groups;
 
       // Save to memory
-      saveSession(state.currentFile, { columns: selectedCols, months: selectedMonths, eventCols });
+      saveSession(state.currentFile, { sid: state.scanData && state.scanData.sid, columns: selectedCols, months: selectedMonths, eventCols });
 
       document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows`;
       buildSidebar(data.groups);

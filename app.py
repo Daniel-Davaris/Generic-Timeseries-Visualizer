@@ -319,7 +319,6 @@ def ingest():
 
     session["dataset_id"] = sid  # Sync session
 
-    data = request.get_json(force=True)
     selected_cols = data.get("columns", [])
     selected_months = set(data.get("months", []))
     event_cols_input = data.get("event_cols", "")
@@ -341,6 +340,23 @@ def ingest():
 
     ds = _get_dataset(sid)
     return jsonify(groups=ds["groups"], row_count=len(df), col_count=len(df.columns))
+
+
+@app.route("/api/check-cache", methods=["POST"])
+def check_cache():
+    """Check if a sid is still cached on the server (avoids re-upload)."""
+    data = request.get_json(force=True)
+    sid = data.get("sid")
+    if sid and sid in _file_cache:
+        cached = _file_cache[sid]
+        df = cached["df"]
+        date_col = cached["date_col"]
+        months = sorted(df[date_col].dt.to_period("M").unique())
+        columns = [c for c in df.columns if c != date_col]
+        return jsonify(cached=True, sid=sid, date_col=date_col, columns=columns,
+                       months=[str(m) for m in months],
+                       row_count=len(df), col_count=len(df.columns))
+    return jsonify(cached=False)
 
 
 @app.route("/api/figure", methods=["POST"])
