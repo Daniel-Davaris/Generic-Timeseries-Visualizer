@@ -582,7 +582,11 @@ uploadArea.addEventListener("drop", e => {
   uploadArea.style.borderColor = "";
   if (e.dataTransfer.files.length) { csvInput.files = e.dataTransfer.files; handleUpload(); }
 });
-uploadArea.addEventListener("click", () => csvInput.click());
+uploadArea.addEventListener("click", (e) => {
+  if (e.target === csvInput) return;
+  if (e.target.closest("label")) return; // Let label handle it natively
+  csvInput.click();
+});
 csvInput.addEventListener("change", handleUpload);
 
 async function handleUpload() {
