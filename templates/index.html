@@ -52,8 +52,7 @@
     .upload-area { border: 1px dashed var(--border); border-radius: 6px; padding: 40px; text-align: center;
                    cursor: pointer; transition: border-color 0.15s; background: var(--bg-secondary); position: relative; }
     .upload-area:hover { border-color: var(--accent); }
-    .upload-area input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2; }
-    .upload-area span { cursor: pointer; font-size: 0.95rem; color: var(--text-secondary); pointer-events: none; position: relative; z-index: 1; }
+    .upload-area span { cursor: pointer; font-size: 0.95rem; color: var(--text-secondary); }
     .upload-area span strong { color: var(--accent); }
     .upload-success { display: flex; align-items: center; gap: 10px; padding: 12px 16px;
                       background: var(--green-bg); border: 1px solid var(--green-border);
@@ -227,11 +226,11 @@
     <div class="homepage-files" id="homepage-files"></div>
     <div class="wizard-step" id="step-upload">
       <h2><span class="step-num">📄</span> Upload new file</h2>
+      <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls" style="display:none">
       <div class="upload-area" id="upload-area">
         <span><strong>Click to upload</strong> or drag &amp; drop a data file<br>
           <small style="color:var(--text-muted)">Supports CSV, Parquet, and Excel (.xlsx/.xls)</small>
         </span>
-        <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls">
       </div>
     </div>
   </div>
@@ -343,7 +342,7 @@ async function deleteFile(name) {
 const MEMORY_KEY = "signal_analyser_sessions";
 function getMemory() {
   try { return JSON.parse(localStorage.getItem(MEMORY_KEY) || "[]"); }
-  catch { return []; }
+  catch(e) { return []; }
 }
 function saveMemory(entries) {
   localStorage.setItem(MEMORY_KEY, JSON.stringify(entries.slice(0, 20)));
@@ -405,7 +404,7 @@ function uploadWithProgress(fd) {
     xhr.onload = () => {
       setProgress(90); // Processing on server
       try { resolve(JSON.parse(xhr.responseText)); }
-      catch { reject(new Error("Invalid response")); }
+      catch(e) { reject(new Error("Invalid response")); }
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
     xhr.send(fd);
@@ -581,6 +580,7 @@ uploadArea.addEventListener("drop", e => {
   uploadArea.style.borderColor = "";
   if (e.dataTransfer.files.length) { csvInput.files = e.dataTransfer.files; handleUpload(); }
 });
+uploadArea.addEventListener("click", () => { csvInput.click(); });
 csvInput.addEventListener("change", handleUpload);
 
 async function handleUpload() {
