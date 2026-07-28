@@ -276,7 +276,15 @@ def upload():
     _set_dataset(sid, df, date_col, event_cols)
 
     ds = _get_dataset(sid)
-    return jsonify(groups=ds["groups"], row_count=len(df), col_count=len(df.columns))
+    date_col = ds["date_col"]
+    date_min = str(ds["df"][date_col].min().date())
+    date_max = str(ds["df"][date_col].max().date())
+    preview = ds["df"].head(10).to_dict(orient="split")
+    return jsonify(
+        groups=ds["groups"], row_count=len(df), col_count=len(df.columns),
+        date_col=date_col, date_min=date_min, date_max=date_max,
+        preview={"columns": preview["columns"], "data": preview["data"]},
+    )
 
 
 @app.route("/api/figure", methods=["POST"])
