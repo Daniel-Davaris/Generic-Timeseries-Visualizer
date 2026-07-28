@@ -296,6 +296,7 @@ def upload():
 
     return Response(
         json.dumps({
+            "sid": sid,
             "date_col": date_col,
             "columns": columns,
             "months": month_list,
@@ -310,10 +311,13 @@ def upload():
 @app.route("/api/ingest", methods=["POST"])
 def ingest():
     """Filter cached dataframe by selected columns and months. No file re-read."""
-    sid = session.get("dataset_id")
+    data = request.get_json(force=True)
+    sid = data.get("sid") or session.get("dataset_id")
     cached = _file_cache.get(sid)
     if not cached:
         return jsonify(error="No file uploaded yet"), 400
+
+    session["dataset_id"] = sid  # Sync session
 
     data = request.get_json(force=True)
     selected_cols = data.get("columns", [])

@@ -476,6 +476,7 @@ async function openSavedFile(entry) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        sid: data.sid,
         columns: entry.columns || [],
         months: entry.months || [],
         event_cols: "",
@@ -705,7 +706,7 @@ document.getElementById("btn-ingest").onclick = () => {
   fetch("/api/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ columns: selectedCols, months: selectedMonths, event_cols: "" }),
+    body: JSON.stringify({ sid: state.scanData && state.scanData.sid, columns: selectedCols, months: selectedMonths, event_cols: "" }),
   })
     .then(r => r.json())
     .then(data => {
