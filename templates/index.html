@@ -731,11 +731,11 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
   this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
 };
 
-// Use ResizeObserver for smooth chart resizing (no jarring re-render)
+// Use ResizeObserver for smooth width-only resize (preserve explicit height)
 const chartResizeObserver = new ResizeObserver(() => {
   const chartDiv = document.getElementById("chart");
   if (chartDiv && chartDiv.data) {
-    Plotly.Plots.resize(chartDiv);
+    Plotly.relayout(chartDiv, { width: chartDiv.clientWidth - 16 });
   }
 });
 chartResizeObserver.observe(document.getElementById("chart"));
@@ -842,7 +842,7 @@ function fetchFigure() {
       // Use the figure's height if it's larger (for multi-subplot views like weekly)
       const figHeight = layout.height || 500;
       layout.height = Math.max(500, figHeight);
-      Plotly.newPlot(chartDiv, fig.data, layout, { responsive: true });
+      Plotly.newPlot(chartDiv, fig.data, layout, { responsive: false });
     })
     .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
 }
