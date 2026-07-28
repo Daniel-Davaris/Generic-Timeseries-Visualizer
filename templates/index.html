@@ -43,11 +43,26 @@
 
     #chart { flex: 1; min-width: 0; }
     .placeholder { text-align: center; color: #999; padding: 60px 20px; font-size: 1.1rem; }
+
+    /* Loading indicator */
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+                       z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+    .loading-overlay.visible { display: flex; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #e0e0e0; border-top-color: #636EFA;
+               border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { margin-top: 14px; font-size: 1rem; color: #555; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>📈 Timeseries Visualiser</h1>
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <p id="loading-text">Uploading and processing file…</p>
+  </div>
 
   <!-- Upload -->
   <div class="upload-area" id="upload-area">
@@ -96,9 +111,13 @@ uploadArea.addEventListener("drop", e => {
 });
 csvInput.addEventListener("change", handleUpload);
 
+function showLoading(msg) { document.getElementById("loading-text").textContent = msg; document.getElementById("loading").classList.add("visible"); }
+function hideLoading() { document.getElementById("loading").classList.remove("visible"); }
+
 function handleUpload() {
   const file = csvInput.files[0];
   if (!file) return;
+  showLoading("Uploading and processing file…");
   const fd = new FormData();
   fd.append("file", file);
   fd.append("event_cols", document.getElementById("event-cols").value);
@@ -106,6 +125,7 @@ function handleUpload() {
   fetch("/api/upload", { method: "POST", body: fd })
     .then(r => r.json())
     .then(data => {
+      hideLoading();
       if (data.error) { alert(data.error); return; }
       state.groups = data.groups;
       document.getElementById("file-label").textContent = file.name;
@@ -114,7 +134,7 @@ function handleUpload() {
       document.getElementById("toolbar").classList.remove("hidden");
       document.getElementById("main-area").classList.remove("hidden");
     })
-    .catch(err => alert("Upload failed: " + err));
+    .catch(err => { hideLoading(); alert("Upload failed: " + err); });
 }
 
 {% if groups %}
@@ -187,6 +207,7 @@ function getSelectedCols() {
 
 function fetchFigure() {
   const cols = getSelectedCols();
+  showLoading("Generating chart…");
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -194,12 +215,13 @@ function fetchFigure() {
   })
     .then(r => r.json())
     .then(fig => {
+      hideLoading();
       if (fig.error) { alert(fig.error); return; }
       const chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
       Plotly.newPlot(chartDiv, fig.data, fig.layout, { responsive: true });
     })
-    .catch(err => console.error("Figure fetch failed:", err));
+    .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
 }
 </script>
 </body>
