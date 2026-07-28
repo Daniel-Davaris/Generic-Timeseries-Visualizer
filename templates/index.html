@@ -728,11 +728,16 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
   const sb = document.getElementById("sidebar");
   sb.classList.toggle("collapsed");
   this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
-  setTimeout(() => {
-    const chartDiv = document.getElementById("chart");
-    if (chartDiv.data) Plotly.Plots.resize(chartDiv);
-  }, 250);
 };
+
+// Use ResizeObserver for smooth chart resizing (no jarring re-render)
+const chartResizeObserver = new ResizeObserver(() => {
+  const chartDiv = document.getElementById("chart");
+  if (chartDiv && chartDiv.data) {
+    Plotly.Plots.resize(chartDiv);
+  }
+});
+chartResizeObserver.observe(document.getElementById("chart"));
 
 function buildSidebar(groups) {
   const sb = document.getElementById("sidebar");
