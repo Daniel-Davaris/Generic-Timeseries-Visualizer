@@ -856,7 +856,7 @@ function fetchFigure() {
       if (!isNaN(yCap) && yCap > 0) {
         for (const key of Object.keys(layout)) {
           if (key.startsWith("yaxis")) {
-            layout[key] = Object.assign({}, layout[key], { range: [0, yCap] });
+            layout[key] = Object.assign({}, layout[key], { range: [-yCap, yCap] });
           }
         }
       }
