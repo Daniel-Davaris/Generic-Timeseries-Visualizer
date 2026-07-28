@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeseries Visualiser</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f6fa; color: #222; }
+    .container { max-width: 1820px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.4rem; margin-bottom: 12px; }
+
+    /* Upload area */
+    .upload-area { background: #fff; border: 2px dashed #bbb; border-radius: 8px;
+                   padding: 32px; text-align: center; margin-bottom: 16px; cursor: pointer; }
+    .upload-area:hover { border-color: #636EFA; }
+    .upload-area.hidden { display: none; }
+    .upload-area input[type=file] { display: none; }
+    .upload-area label { cursor: pointer; font-size: 1.1rem; color: #555; }
+    .upload-area label strong { color: #636EFA; }
+    #event-cols-row { margin-top: 10px; font-size: 0.9rem; }
+    #event-cols-row input[type=text] { padding: 4px 8px; width: 360px; border: 1px solid #ccc; border-radius: 4px; }
+
+    /* Toolbar */
+    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+    .toolbar button { padding: 6px 16px; border: 1px solid #ccc; border-radius: 4px;
+                      background: #fff; cursor: pointer; font-size: 0.9rem; }
+    .toolbar button:hover { background: #e8e8e8; }
+    .toolbar button.active { background: #636EFA; color: #fff; border-color: #636EFA; }
+
+    /* Main layout */
+    .main { display: flex; gap: 12px; align-items: flex-start; }
+    .sidebar { width: 340px; min-width: 260px; max-height: 85vh; overflow-y: auto;
+               background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+    .sidebar details { margin-bottom: 6px; }
+    .sidebar summary { cursor: pointer; font-weight: 600; padding: 4px; }
+    .sidebar .group-btns { display: flex; gap: 4px; margin: 4px 0; }
+    .sidebar .group-btns button { font-size: 0.75rem; padding: 2px 8px; border: 1px solid #ccc;
+                                   border-radius: 3px; background: #f9f9f9; cursor: pointer; }
+    .sidebar label { display: block; padding: 2px 0; font-size: 0.85rem; cursor: pointer; }
+    .sidebar input[type=checkbox] { margin-right: 6px; }
+
+    #chart { flex: 1; min-width: 0; }
+    .placeholder { text-align: center; color: #999; padding: 60px 20px; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📈 Timeseries Visualiser</h1>
+
+  <!-- Upload -->
+  <div class="upload-area" id="upload-area">
+    <label for="csv-file">
+      <strong>Click to upload</strong> or drag &amp; drop a CSV file<br>
+      <small>The file must contain a date column</small>
+    </label>
+    <input type="file" id="csv-file" accept=".csv">
+    <div id="event-cols-row">
+      <label for="event-cols">Event columns <small>(comma-separated, optional)</small>:</label>
+      <input type="text" id="event-cols" placeholder="e.g. input_ToU_label, input_Trade_signal, window">
+    </div>
+  </div>
+
+  <!-- Controls (hidden until data loaded) -->
+  <div class="toolbar hidden" id="toolbar">
+    <button id="btn-weekly">Weekly</button>
+    <button id="btn-monthly">Monthly</button>
+    <button id="btn-yearly" class="active">Yearly</button>
+    <button id="btn-normalise">Show normalised</button>
+    <button id="btn-apply">Apply selection</button>
+    <span id="file-label" style="margin-left:auto;font-size:.85rem;color:#888"></span>
+  </div>
+
+  <div class="main hidden" id="main-area">
+    <div class="sidebar" id="sidebar"></div>
+    <div id="chart">
+      <div class="placeholder">Select columns from the sidebar and click <strong>Apply selection</strong></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { period: "Yearly", normalised: false, groups: null };
+
+// ── Upload ──────────────────────────────────────────────────────────
+const uploadArea = document.getElementById("upload-area");
+const csvInput = document.getElementById("csv-file");
+
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.style.borderColor = "#636EFA"; });
+uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "#bbb"; });
+uploadArea.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadArea.style.borderColor = "#bbb";
+  if (e.dataTransfer.files.length) { csvInput.files = e.dataTransfer.files; handleUpload(); }
+});
+csvInput.addEventListener("change", handleUpload);
+
+function handleUpload() {
+  const file = csvInput.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("event_cols", document.getElementById("event-cols").value);
+
+  fetch("/api/upload", { method: "POST", body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert(data.error); return; }
+      state.groups = data.groups;
+      document.getElementById("file-label").textContent = file.name;
+      buildSidebar(data.groups);
+      uploadArea.classList.add("hidden");
+      document.getElementById("toolbar").classList.remove("hidden");
+      document.getElementById("main-area").classList.remove("hidden");
+    })
+    .catch(err => alert("Upload failed: " + err));
+}
+
+{% if groups %}
+// Pre-loaded dataset
+state.groups = {{ groups | tojson }};
+document.addEventListener("DOMContentLoaded", () => {
+  buildSidebar(state.groups);
+  uploadArea.classList.add("hidden");
+  document.getElementById("toolbar").classList.remove("hidden");
+  document.getElementById("main-area").classList.remove("hidden");
+});
+{% endif %}
+
+// ── Sidebar ─────────────────────────────────────────────────────────
+function buildSidebar(groups) {
+  const sb = document.getElementById("sidebar");
+  sb.innerHTML = "";
+  for (const [group, cols] of Object.entries(groups)) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = group;
+    details.appendChild(summary);
+
+    const btns = document.createElement("div");
+    btns.className = "group-btns";
+    const selAll = document.createElement("button");
+    selAll.textContent = "Select all";
+    selAll.onclick = () => details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+    const clr = document.createElement("button");
+    clr.textContent = "Clear";
+    clr.onclick = () => details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+    btns.append(selAll, clr);
+    details.appendChild(btns);
+
+    for (const col of cols) {
+      const lbl = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.value = col; cb.name = "col";
+      lbl.append(cb, " " + col);
+      details.appendChild(lbl);
+    }
+    sb.appendChild(details);
+  }
+}
+
+// ── Toolbar ─────────────────────────────────────────────────────────
+function setPeriod(p) {
+  state.period = p;
+  document.querySelectorAll("#btn-weekly,#btn-monthly,#btn-yearly").forEach(b => b.classList.remove("active"));
+  document.getElementById("btn-" + p.toLowerCase()).classList.add("active");
+}
+
+document.getElementById("btn-weekly").onclick = () => { setPeriod("Weekly"); fetchFigure(); };
+document.getElementById("btn-monthly").onclick = () => { setPeriod("Monthly"); fetchFigure(); };
+document.getElementById("btn-yearly").onclick = () => { setPeriod("Yearly"); fetchFigure(); };
+
+document.getElementById("btn-normalise").onclick = function () {
+  state.normalised = !state.normalised;
+  this.textContent = state.normalised ? "Show raw" : "Show normalised";
+  this.classList.toggle("active", state.normalised);
+  fetchFigure();
+};
+
+document.getElementById("btn-apply").onclick = () => fetchFigure();
+
+// ── Fetch figure ────────────────────────────────────────────────────
+function getSelectedCols() {
+  return [...document.querySelectorAll('#sidebar input[type=checkbox]:checked')].map(cb => cb.value);
+}
+
+function fetchFigure() {
+  const cols = getSelectedCols();
+  fetch("/api/figure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols }),
+  })
+    .then(r => r.json())
+    .then(fig => {
+      if (fig.error) { alert(fig.error); return; }
+      const chartDiv = document.getElementById("chart");
+      chartDiv.innerHTML = "";
+      Plotly.newPlot(chartDiv, fig.data, fig.layout, { responsive: true });
+    })
+    .catch(err => console.error("Figure fetch failed:", err));
+}
+</script>
+</body>
+</html>
