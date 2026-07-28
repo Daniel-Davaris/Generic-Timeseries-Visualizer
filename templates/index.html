@@ -190,6 +190,9 @@
                border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-overlay p { margin-top: 14px; font-size: 0.9rem; color: var(--text-secondary); }
+    .progress-bar { width: 220px; height: 6px; background: var(--border); border-radius: 3px; margin-top: 12px; overflow: hidden; }
+    .progress-bar .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.15s; width: 0%; }
+    .progress-pct { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
 
     /* Scrollbar styling */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -208,6 +211,8 @@
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
     <p id="loading-text">Uploading and processing file…</p>
+    <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <span class="progress-pct" id="progress-pct"></span>
   </div>
 
   <!-- ═══ HOMEPAGE ═══ -->
@@ -362,8 +367,37 @@ function showView(view) {
   document.getElementById("main-area").classList.toggle("hidden", view !== "visualiser");
 }
 
-function showLoading(msg) { document.getElementById("loading-text").textContent = msg; document.getElementById("loading").classList.add("visible"); }
+function showLoading(msg) {
+  document.getElementById("loading-text").textContent = msg;
+  document.getElementById("progress-fill").style.width = "0%";
+  document.getElementById("progress-pct").textContent = "";
+  document.getElementById("loading").classList.add("visible");
+}
 function hideLoading() { document.getElementById("loading").classList.remove("visible"); }
+function setProgress(pct) {
+  document.getElementById("progress-fill").style.width = pct + "%";
+  document.getElementById("progress-pct").textContent = Math.round(pct) + "%";
+}
+
+function uploadWithProgress(fd) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = (e.loaded / e.total) * 70; // Upload is 0-70%
+        setProgress(pct);
+      }
+    };
+    xhr.onload = () => {
+      setProgress(90); // Processing on server
+      try { resolve(JSON.parse(xhr.responseText)); }
+      catch { reject(new Error("Invalid response")); }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.send(fd);
+  });
+}
 
 // ── Homepage ────────────────────────────────────────────────────────
 function renderHomepage() {
@@ -411,7 +445,6 @@ function renderHomepage() {
 }
 
 async function openSavedFile(entry) {
-  // Try to load file from IndexedDB cache
   const cached = await getFile(entry.filename);
   if (!cached) {
     alert(`File "${entry.filename}" is no longer cached.\nPlease re-upload it.`);
@@ -420,14 +453,13 @@ async function openSavedFile(entry) {
   }
   state.pendingRestore = entry;
   state.currentFile = entry.filename;
-  // Auto-upload from cache
   showLoading("Loading " + entry.filename + "…");
   const fd = new FormData();
   fd.append("file", cached.blob, entry.filename);
 
   try {
-    const r = await fetch("/api/upload", { method: "POST", body: fd });
-    const data = await r.json();
+    const data = await uploadWithProgress(fd);
+    setProgress(100);
     hideLoading();
     if (data.error) { alert(data.error); return; }
     state.scanData = data;
@@ -475,7 +507,7 @@ async function handleUpload() {
   const file = csvInput.files[0];
   if (!file) return;
   state.currentFile = file.name;
-  showLoading("Scanning file…");
+  showLoading("Uploading " + file.name + "…");
 
   // Cache file blob in IndexedDB
   await storeFile(file.name, file);
@@ -484,13 +516,12 @@ async function handleUpload() {
   fd.append("file", file);
 
   try {
-    const r = await fetch("/api/upload", { method: "POST", body: fd });
-    const data = await r.json();
+    const data = await uploadWithProgress(fd);
+    setProgress(100);
     hideLoading();
     if (data.error) { alert(data.error); return; }
     state.scanData = data;
 
-    // If we have a pending restore (clicked a saved file but it wasn't cached)
     const restore = state.pendingRestore;
     state.pendingRestore = null;
     showWizardWithRestore(data, restore);
