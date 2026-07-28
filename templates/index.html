@@ -325,61 +325,97 @@ function handleUpload() {
 // ── Wizard Step 2: Column & Month selection ─────────────────────────
 function buildColumnList(columns) {
   const list = document.getElementById("col-list");
-  list.innerHTML = "";
+  // Use DocumentFragment for fast DOM insertion
+  const frag = document.createDocumentFragment();
   columns.forEach(col => {
     const lbl = document.createElement("label");
     const cb = document.createElement("input");
     cb.type = "checkbox"; cb.value = col; cb.checked = true;
+    cb.addEventListener("change", updatePreview);
     lbl.append(cb, " " + col);
-    list.appendChild(lbl);
+    frag.appendChild(lbl);
   });
+  list.innerHTML = "";
+  list.appendChild(frag);
 }
 
 function buildMonthList(months) {
   const list = document.getElementById("month-list");
-  list.innerHTML = "";
+  const frag = document.createDocumentFragment();
   months.forEach(m => {
     const lbl = document.createElement("label");
     const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.value = m; cb.checked = true;
+    cb.type = "checkbox"; cb.value = m; cb.checked = false; // Unticked by default
+    cb.addEventListener("change", updatePreview);
     lbl.append(cb, " " + m);
-    list.appendChild(lbl);
+    frag.appendChild(lbl);
   });
+  list.innerHTML = "";
+  list.appendChild(frag);
+}
+
+function updatePreview() {
+  if (!state.scanData) return;
+  const preview = state.scanData.preview;
+  const dateCcol = state.scanData.date_col;
+  const selectedCols = new Set([...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value));
+  const selectedMonths = new Set([...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value));
+  selectedCols.add(dateCcol); // Always show date col
+
+  // Filter columns
+  const colIndices = [];
+  const filteredCols = [];
+  preview.columns.forEach((col, i) => {
+    if (selectedCols.has(col)) { colIndices.push(i); filteredCols.push(col); }
+  });
+
+  // Filter rows by selected months
+  const dateIdx = preview.columns.indexOf(dateCcol);
+  let filteredRows = preview.data;
+  if (selectedMonths.size > 0 && dateIdx >= 0) {
+    filteredRows = preview.data.filter(row => {
+      const d = row[dateIdx];
+      if (!d) return false;
+      // Match YYYY-MM format
+      const m = String(d).substring(0, 7);
+      return selectedMonths.has(m);
+    });
+  }
+
+  // Render filtered preview
+  const table = document.getElementById("preview-table");
+  const html = ['<thead><tr>'];
+  filteredCols.forEach(col => html.push(`<th>${col}</th>`));
+  html.push('</tr></thead><tbody>');
+  filteredRows.forEach(row => {
+    html.push('<tr>');
+    colIndices.forEach(i => html.push(`<td>${row[i] === null ? '' : row[i]}</td>`));
+    html.push('</tr>');
+  });
+  html.push('</tbody>');
+  table.innerHTML = html.join('');
 }
 
 function buildPreviewTable(preview) {
-  const table = document.getElementById("preview-table");
-  table.innerHTML = "";
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  preview.columns.forEach(col => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
-  preview.data.forEach(row => {
-    const tr = document.createElement("tr");
-    row.forEach(val => {
-      const td = document.createElement("td");
-      td.textContent = val === null ? "" : val;
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
+  updatePreview();
 }
 
-document.getElementById("cols-select-all").onclick = () =>
+document.getElementById("cols-select-all").onclick = () => {
   document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => cb.checked = true);
-document.getElementById("cols-clear").onclick = () =>
+  updatePreview();
+};
+document.getElementById("cols-clear").onclick = () => {
   document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => cb.checked = false);
-document.getElementById("months-select-all").onclick = () =>
+  updatePreview();
+};
+document.getElementById("months-select-all").onclick = () => {
   document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = true);
-document.getElementById("months-clear").onclick = () =>
+  updatePreview();
+};
+document.getElementById("months-clear").onclick = () => {
   document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = false);
+  updatePreview();
+};
 
 // Ingest button
 document.getElementById("btn-ingest").onclick = () => {

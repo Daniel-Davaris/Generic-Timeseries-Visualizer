@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import plotly
 import plotly.graph_objs as go
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -224,6 +224,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
 # In-memory store keyed by session id
 _datasets = {}
+_file_cache = {}  # Cache uploaded file data to avoid re-reading
 
 
 def _get_dataset(sid):
@@ -251,7 +252,7 @@ def index():
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    """Phase 1: Save file and scan metadata (columns + date periods)."""
+    """Save file, read it once, cache in memory. Return columns + months + preview."""
     file = request.files.get("file")
     if not file:
         return jsonify(error="No file provided"), 400
@@ -269,36 +270,49 @@ def upload():
     except Exception as exc:
         return jsonify(error=str(exc)), 400
 
-    # Store minimal scan info in session
     sid = os.urandom(8).hex()
     session["dataset_id"] = sid
-    session["dataset_path"] = path
-    session["date_col"] = date_col
 
-    # Compute available months/years
+    # Cache full dataframe for fast ingest (no re-read)
+    _file_cache[sid] = {"df": df, "date_col": date_col, "path": path}
+
+    # Compute months quickly using numpy
     months = sorted(df[date_col].dt.to_period("M").unique())
     month_list = [str(m) for m in months]
 
     columns = [c for c in df.columns if c != date_col]
-    preview = df.head(10).to_dict(orient="split")
 
-    return jsonify(
-        date_col=date_col,
-        columns=columns,
-        months=month_list,
-        row_count=len(df),
-        col_count=len(df.columns),
-        preview={"columns": preview["columns"], "data": preview["data"]},
+    # Preview: first 10 rows, convert to lists for fast JSON
+    preview_df = df.head(10)
+    preview_cols = list(preview_df.columns)
+    preview_data = preview_df.values.tolist()
+    # Convert timestamps to strings in preview
+    for row in preview_data:
+        for i, v in enumerate(row):
+            if hasattr(v, 'isoformat'):
+                row[i] = str(v)
+            elif pd.isna(v):
+                row[i] = None
+
+    return Response(
+        json.dumps({
+            "date_col": date_col,
+            "columns": columns,
+            "months": month_list,
+            "row_count": len(df),
+            "col_count": len(df.columns),
+            "preview": {"columns": preview_cols, "data": preview_data},
+        }, default=str),
+        mimetype="application/json",
     )
 
 
 @app.route("/api/ingest", methods=["POST"])
 def ingest():
-    """Phase 2: Load only selected columns and date periods."""
+    """Filter cached dataframe by selected columns and months. No file re-read."""
     sid = session.get("dataset_id")
-    path = session.get("dataset_path")
-    date_col = session.get("date_col")
-    if not sid or not path:
+    cached = _file_cache.get(sid)
+    if not cached:
         return jsonify(error="No file uploaded yet"), 400
 
     data = request.get_json(force=True)
@@ -307,17 +321,15 @@ def ingest():
     event_cols_input = data.get("event_cols", "")
     event_cols = set(c.strip() for c in event_cols_input.split(",") if c.strip())
 
-    try:
-        df, date_col = _load_file(path)
-    except Exception as exc:
-        return jsonify(error=str(exc)), 400
+    df = cached["df"]
+    date_col = cached["date_col"]
 
-    # Filter to selected months
+    # Filter months using vectorized period comparison
     if selected_months:
-        df_periods = df[date_col].dt.to_period("M").astype(str)
-        df = df[df_periods.isin(selected_months)]
+        period_strs = df[date_col].dt.to_period("M").astype(str)
+        df = df[period_strs.isin(selected_months)]
 
-    # Keep only selected columns + date column
+    # Select only requested columns
     keep_cols = [date_col] + [c for c in selected_cols if c in df.columns]
     df = df[keep_cols].reset_index(drop=True)
 
@@ -343,7 +355,8 @@ def figure():
         ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
         ds["colors"], period, normalised, selected_cols,
     )
-    return jsonify(json.loads(plotly.io.to_json(fig)))
+    # Return pre-serialized JSON directly (skip double parse)
+    return Response(plotly.io.to_json(fig), mimetype="application/json")
 
 
 if __name__ == "__main__":
