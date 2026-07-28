@@ -279,6 +279,9 @@
     <button id="btn-monthly">Monthly</button>
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
+    <label style="font-size:.75rem;color:var(--text-muted);margin-left:10px;display:flex;align-items:center;gap:4px;">
+      Y cap <input type="number" id="y-axis-cap" style="width:70px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
+    </label>
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
     <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
     <button id="btn-home" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">🏠 Home</button>
@@ -794,6 +797,8 @@ document.getElementById("btn-normalise").onclick = function () {
   fetchFigure();
 };
 
+document.getElementById("y-axis-cap").addEventListener("change", fetchFigure);
+
 
 
 // Edit selection: go back to wizard with current scanData and restore current selections
@@ -836,6 +841,16 @@ function fetchFigure() {
         }
       }
       if (layout.title) layout.title.font = { color: '#e6edf3', size: 14 };
+
+      // Apply Y axis cap if set
+      const yCap = parseFloat(document.getElementById("y-axis-cap").value);
+      if (!isNaN(yCap) && yCap > 0) {
+        for (const key of Object.keys(layout)) {
+          if (key.startsWith("yaxis")) {
+            layout[key] = Object.assign({}, layout[key], { range: [0, yCap] });
+          }
+        }
+      }
 
       const chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
