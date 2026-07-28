@@ -53,8 +53,8 @@
                    cursor: pointer; transition: border-color 0.15s; background: var(--bg-secondary); }
     .upload-area:hover { border-color: var(--accent); }
     .upload-area input[type=file] { display: none; }
-    .upload-area label { cursor: pointer; font-size: 0.95rem; color: var(--text-secondary); }
-    .upload-area label strong { color: var(--accent); }
+    .upload-area span { cursor: pointer; font-size: 0.95rem; color: var(--text-secondary); }
+    .upload-area span strong { color: var(--accent); }
     .upload-success { display: flex; align-items: center; gap: 10px; padding: 12px 16px;
                       background: var(--green-bg); border: 1px solid var(--green-border);
                       border-radius: 6px; font-size: 0.85rem; color: var(--green); }
@@ -228,10 +228,9 @@
     <div class="wizard-step" id="step-upload">
       <h2><span class="step-num">📄</span> Upload new file</h2>
       <div class="upload-area" id="upload-area">
-        <label>
-          <strong>Click to upload</strong> or drag &amp; drop a data file<br>
+        <span><strong>Click to upload</strong> or drag &amp; drop a data file<br>
           <small style="color:var(--text-muted)">Supports CSV, Parquet, and Excel (.xlsx/.xls)</small>
-        </label>
+        </span>
         <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls">
       </div>
     </div>
