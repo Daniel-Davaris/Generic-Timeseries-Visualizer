@@ -290,9 +290,24 @@ def figure():
     period = data.get("period", "Yearly")
     normalised = bool(data.get("normalised", False))
     selected_cols = data.get("selected_cols", [])
+    date_start = data.get("date_start")
+    date_end = data.get("date_end")
+
+    df = ds["df"]
+    raw_series = ds["raw_series"]
+    date_col = ds["date_col"]
+
+    if date_start or date_end:
+        mask = pd.Series(True, index=df.index)
+        if date_start:
+            mask &= df[date_col] >= pd.to_datetime(date_start)
+        if date_end:
+            mask &= df[date_col] <= pd.to_datetime(date_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        df = df[mask]
+        raw_series = {col: s.loc[df.index] for col, s in raw_series.items()}
 
     fig = build_figure(
-        ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
+        df, date_col, raw_series, ds["event_cols"],
         ds["colors"], period, normalised, selected_cols,
     )
     return jsonify(json.loads(plotly.io.to_json(fig)))
