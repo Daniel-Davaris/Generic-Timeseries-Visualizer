@@ -3,109 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timeseries Visualiser</title>
+  <title>Signal Analyser</title>
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
   <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #1c2128;
+      --bg-card: #1c2128;
+      --border: #30363d;
+      --border-highlight: #58a6ff;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --green-bg: #0d2818;
+      --green-border: #238636;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #a371f7;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f6fa; color: #222; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+           background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; }
     .container { max-width: 100%; margin: 0 auto; padding: 16px; overflow-x: hidden; }
-    h1 { font-size: 1.4rem; margin-bottom: 12px; }
     .hidden { display: none !important; }
+
+    /* Header */
+    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+                  padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .app-header h1 { font-size: 1.3rem; font-weight: 600; color: var(--text-primary); }
+    .app-header .logo { font-size: 1.5rem; }
+    .app-header .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; text-transform: uppercase;
+                            letter-spacing: 1px; }
 
     /* Wizard */
     .wizard { max-width: 1000px; margin: 0 auto; }
-    .wizard-step { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 16px; }
-    .wizard-step h2 { font-size: 1.1rem; margin-bottom: 12px; color: #333; }
-    .wizard-step .step-num { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center;
-                             background: #636EFA; color: #fff; border-radius: 50%; font-size: 0.85rem; font-weight: 700;
-                             margin-right: 8px; }
-    .wizard-step.disabled { opacity: 0.45; pointer-events: none; }
+    .wizard-step { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+                   padding: 24px; margin-bottom: 16px; }
+    .wizard-step h2 { font-size: 1rem; margin-bottom: 14px; color: var(--text-primary); font-weight: 600; }
+    .wizard-step .step-num { display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center;
+                             background: var(--accent); color: var(--bg-primary); border-radius: 50%;
+                             font-size: 0.75rem; font-weight: 700; margin-right: 8px; }
+    .wizard-step.disabled { opacity: 0.35; pointer-events: none; }
 
     /* Upload area */
-    .upload-area { border: 2px dashed #bbb; border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; }
-    .upload-area:hover { border-color: #636EFA; }
+    .upload-area { border: 1px dashed var(--border); border-radius: 6px; padding: 40px; text-align: center;
+                   cursor: pointer; transition: border-color 0.15s; background: var(--bg-secondary); }
+    .upload-area:hover { border-color: var(--accent); }
     .upload-area input[type=file] { display: none; }
-    .upload-area label { cursor: pointer; font-size: 1.05rem; color: #555; }
-    .upload-area label strong { color: #636EFA; }
-    .upload-success { display: flex; align-items: center; gap: 10px; padding: 12px; background: #e8faf3;
-                      border: 1px solid #00CC96; border-radius: 6px; font-size: 0.9rem; color: #1a7a5a; }
-    .upload-success .file-info { font-weight: 600; }
+    .upload-area label { cursor: pointer; font-size: 0.95rem; color: var(--text-secondary); }
+    .upload-area label strong { color: var(--accent); }
+    .upload-success { display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+                      background: var(--green-bg); border: 1px solid var(--green-border);
+                      border-radius: 6px; font-size: 0.85rem; color: var(--green); }
+    .upload-success .file-info { font-weight: 600; color: var(--text-primary); }
 
     /* Selection panels */
     .select-panels { display: flex; gap: 16px; flex-wrap: wrap; }
     .select-panel { flex: 1; min-width: 280px; }
-    .select-panel h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; color: #444; }
+    .select-panel h3 { font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary);
+                       text-transform: uppercase; letter-spacing: 0.5px; }
     .select-panel .panel-actions { display: flex; gap: 6px; margin-bottom: 6px; }
-    .select-panel .panel-actions button { font-size: 0.75rem; padding: 2px 8px; border: 1px solid #ccc;
-                                          border-radius: 3px; background: #f9f9f9; cursor: pointer; }
-    .select-list { max-height: 350px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 6px;
-                   background: #fafafa; }
-    .select-list label { display: block; padding: 3px 4px; font-size: 0.83rem; cursor: pointer; border-radius: 3px; }
-    .select-list label:hover { background: #e8ecff; }
-    .select-list input[type=checkbox] { margin-right: 6px; }
+    .select-panel .panel-actions button { font-size: 0.7rem; padding: 3px 10px; border: 1px solid var(--border);
+                                          border-radius: 4px; background: var(--bg-secondary); color: var(--text-secondary);
+                                          cursor: pointer; transition: all 0.15s; }
+    .select-panel .panel-actions button:hover { border-color: var(--accent); color: var(--accent); }
+    .select-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;
+                   padding: 4px; background: var(--bg-secondary); }
+    .select-list label { display: block; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; border-radius: 3px;
+                         color: var(--text-secondary); transition: background 0.1s; }
+    .select-list label:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .select-list input[type=checkbox] { margin-right: 8px; accent-color: var(--accent); }
 
     /* Config row */
-    .config-row { margin-top: 14px; }
-    .config-row label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: #444; }
-    .config-row input[type=text] { width: 100%; max-width: 500px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    .config-row { margin-top: 16px; }
+    .config-row label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;
+                        color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+    .config-row input[type=text] { width: 100%; max-width: 500px; padding: 8px 12px; border: 1px solid var(--border);
+                                   border-radius: 4px; font-size: 0.85rem; background: var(--bg-secondary);
+                                   color: var(--text-primary); transition: border-color 0.15s; }
+    .config-row input[type=text]:focus { outline: none; border-color: var(--accent); }
 
     /* Preview table */
-    .preview-wrap { overflow-x: auto; margin-top: 14px; }
-    .preview-wrap h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; color: #444; }
-    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
-    .preview-table th, .preview-table td { padding: 4px 8px; border: 1px solid #ddd; text-align: left; white-space: nowrap; }
-    .preview-table th { background: #f0f2f8; font-weight: 600; position: sticky; top: 0; }
-    .preview-table tr:nth-child(even) { background: #fafafa; }
+    .preview-wrap { overflow-x: auto; margin-top: 16px; }
+    .preview-wrap h3 { font-size: 0.8rem; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);
+                       text-transform: uppercase; letter-spacing: 0.5px; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    .preview-table th, .preview-table td { padding: 6px 10px; border: 1px solid var(--border);
+                                           text-align: left; white-space: nowrap; }
+    .preview-table th { background: var(--bg-tertiary); font-weight: 600; color: var(--text-secondary);
+                        position: sticky; top: 0; }
+    .preview-table td { color: var(--text-primary); }
+    .preview-table tr:nth-child(even) td { background: rgba(56,139,253,0.02); }
 
-    /* Wizard buttons */
-    .wizard-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-    .btn { padding: 8px 20px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
-    .btn:hover { background: #e8e8e8; }
-    .btn-go { background: #00CC96; color: #fff; border-color: #00CC96; font-weight: 700; font-size: 1rem; padding: 10px 28px; }
-    .btn-go:hover { background: #00b386; }
+    /* Buttons */
+    .wizard-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+    .btn { padding: 8px 18px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary);
+           cursor: pointer; font-size: 0.85rem; color: var(--text-secondary); transition: all 0.15s; }
+    .btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+    .btn-go { background: var(--green-border); color: #fff; border-color: var(--green-border);
+              font-weight: 600; font-size: 0.9rem; padding: 10px 24px; }
+    .btn-go:hover { background: var(--green); }
 
     /* Toolbar */
-    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
-    .toolbar button { padding: 6px 16px; border: 1px solid #ccc; border-radius: 4px;
-                      background: #fff; cursor: pointer; font-size: 0.9rem; }
-    .toolbar button:hover { background: #e8e8e8; }
-    .toolbar button.active { background: #636EFA; color: #fff; border-color: #636EFA; }
-    .toolbar button.primary { background: #00CC96; color: #fff; border-color: #00CC96;
-                              font-weight: 700; font-size: 0.95rem; padding: 8px 22px; }
-    .toolbar button.primary:hover { background: #00b386; border-color: #00b386; }
+    .toolbar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
+               padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border);
+               border-radius: 6px; }
+    .toolbar button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px;
+                      background: var(--bg-tertiary); cursor: pointer; font-size: 0.82rem;
+                      color: var(--text-secondary); transition: all 0.15s; }
+    .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+    .toolbar button.active { background: var(--accent); color: var(--bg-primary); border-color: var(--accent);
+                             font-weight: 600; }
+    .toolbar button.primary { background: var(--green-border); color: #fff; border-color: var(--green-border);
+                              font-weight: 700; font-size: 0.88rem; padding: 8px 20px; }
+    .toolbar button.primary:hover { background: var(--green); border-color: var(--green); }
 
     /* Main layout */
-    .main { display: flex; gap: 12px; align-items: flex-start; overflow: hidden; }
-    .sidebar { width: 340px; min-width: 0; max-height: 85vh; overflow-y: auto;
-               background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; flex-shrink: 0;
-               transition: width 0.2s, padding 0.2s, opacity 0.2s; }
+    .main { display: flex; gap: 10px; align-items: flex-start; overflow: hidden; }
+    .sidebar { width: 300px; min-width: 0; max-height: 85vh; overflow-y: auto;
+               background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
+               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s, opacity 0.2s; }
     .sidebar.collapsed { width: 0; padding: 0; border: none; opacity: 0; overflow: hidden; }
-    .sidebar details { margin-bottom: 6px; }
-    .sidebar summary { cursor: pointer; font-weight: 600; padding: 4px; }
-    .sidebar .group-btns { display: flex; gap: 4px; margin: 4px 0; }
-    .sidebar .group-btns button { font-size: 0.75rem; padding: 2px 8px; border: 1px solid #ccc;
-                                   border-radius: 3px; background: #f9f9f9; cursor: pointer; }
-    .sidebar label { display: block; padding: 2px 0; font-size: 0.85rem; cursor: pointer; }
-    .sidebar input[type=checkbox] { margin-right: 6px; }
-    .toggle-sidebar { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px;
-                      cursor: pointer; font-size: 1rem; align-self: flex-start; flex-shrink: 0; }
+    .sidebar details { margin-bottom: 4px; }
+    .sidebar summary { cursor: pointer; font-weight: 600; padding: 6px 4px; font-size: 0.82rem;
+                       color: var(--text-secondary); border-radius: 3px; }
+    .sidebar summary:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .sidebar .group-btns { display: flex; gap: 4px; margin: 4px 0 4px 8px; }
+    .sidebar .group-btns button { font-size: 0.7rem; padding: 2px 8px; border: 1px solid var(--border);
+                                   border-radius: 3px; background: var(--bg-tertiary); color: var(--text-muted);
+                                   cursor: pointer; }
+    .sidebar .group-btns button:hover { color: var(--accent); border-color: var(--accent); }
+    .sidebar label { display: block; padding: 3px 4px 3px 12px; font-size: 0.8rem; cursor: pointer;
+                     color: var(--text-secondary); border-radius: 3px; }
+    .sidebar label:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .sidebar input[type=checkbox] { margin-right: 6px; accent-color: var(--accent); }
+    .toggle-sidebar { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;
+                      padding: 6px 10px; cursor: pointer; font-size: 0.9rem; align-self: flex-start;
+                      flex-shrink: 0; color: var(--text-secondary); transition: all 0.15s; }
+    .toggle-sidebar:hover { color: var(--accent); border-color: var(--accent); }
 
-    #chart { flex: 1; min-width: 0; overflow-x: auto; max-width: 100%; }
-    .placeholder { text-align: center; color: #999; padding: 60px 20px; font-size: 1.1rem; }
+    #chart { flex: 1; min-width: 0; overflow-x: auto; max-width: 100%; background: var(--bg-secondary);
+             border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+    .placeholder { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 0.95rem; }
 
     /* Loading indicator */
-    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.9);
                        z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
     .loading-overlay.visible { display: flex; }
-    .spinner { width: 48px; height: 48px; border: 4px solid #e0e0e0; border-top-color: #636EFA;
-               border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent);
+               border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-overlay p { margin-top: 14px; font-size: 1rem; color: #555; }
+    .loading-overlay p { margin-top: 14px; font-size: 0.9rem; color: var(--text-secondary); }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>📈 Timeseries Visualiser</h1>
+  <div class="app-header">
+    <span class="logo">⚡</span>
+    <h1>Signal Analyser</h1>
+    <span class="subtitle">Timeseries Intelligence</span>
+  </div>
 
   <!-- Loading overlay -->
   <div class="loading-overlay" id="loading">
@@ -122,14 +190,14 @@
       <div class="upload-area" id="upload-area">
         <label for="csv-file">
           <strong>Click to upload</strong> or drag &amp; drop a data file<br>
-          <small>Supports CSV, Parquet, and Excel (.xlsx/.xls)</small>
+          <small style="color:var(--text-muted)">Supports CSV, Parquet, and Excel (.xlsx/.xls)</small>
         </label>
         <input type="file" id="csv-file" accept=".csv,.parquet,.parq,.xlsx,.xls">
       </div>
       <div class="upload-success hidden" id="upload-success">
-        <span>✅</span>
+        <span>✓</span>
         <span class="file-info" id="upload-file-info"></span>
-        <button class="btn" id="btn-change-file" style="margin-left:auto;font-size:.8rem;">Change file</button>
+        <button class="btn" id="btn-change-file" style="margin-left:auto;font-size:.75rem;">Change file</button>
       </div>
     </div>
 
@@ -157,7 +225,7 @@
       </div>
 
       <div class="config-row">
-        <label for="event-cols">Event columns <small>(comma-separated, optional)</small></label>
+        <label for="event-cols">Event columns <small style="text-transform:none;letter-spacing:0">(comma-separated, optional)</small></label>
         <input type="text" id="event-cols">
       </div>
 
@@ -178,22 +246,30 @@
     <button id="btn-monthly">Monthly</button>
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
-    <button id="btn-apply" class="primary">Apply selection</button>
-    <span id="row-count" style="margin-left:12px;font-size:.85rem;color:#555;font-weight:600"></span>
-    <span id="file-label" style="margin-left:auto;font-size:.85rem;color:#888"></span>
-    <button id="btn-new-file" style="margin-left:8px;font-size:.8rem;padding:4px 10px;">📂 New file</button>
+    <button id="btn-apply" class="primary">⚡ Apply selection</button>
+    <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
+    <span id="file-label" style="margin-left:auto;font-size:.8rem;color:var(--text-muted)"></span>
+    <button id="btn-new-file" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">↩ New file</button>
   </div>
 
   <div class="main hidden" id="main-area">
     <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     <div class="sidebar" id="sidebar"></div>
     <div id="chart">
-      <div class="placeholder">Select columns from the sidebar and click <strong>Apply selection</strong></div>
+      <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
     </div>
   </div>
 </div>
 
 <script>
+const DARK_PLOTLY_LAYOUT = {
+  paper_bgcolor: '#1c2128',
+  plot_bgcolor: '#161b22',
+  font: { color: '#8b949e', size: 11 },
+  xaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
+  yaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
+};
+
 const state = { period: "Yearly", normalised: false, groups: null, scanData: null };
 
 function showLoading(msg) { document.getElementById("loading-text").textContent = msg; document.getElementById("loading").classList.add("visible"); }
@@ -203,11 +279,11 @@ function hideLoading() { document.getElementById("loading").classList.remove("vi
 const uploadArea = document.getElementById("upload-area");
 const csvInput = document.getElementById("csv-file");
 
-uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.style.borderColor = "#636EFA"; });
-uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "#bbb"; });
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.style.borderColor = "var(--accent)"; });
+uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = ""; });
 uploadArea.addEventListener("drop", e => {
   e.preventDefault();
-  uploadArea.style.borderColor = "#bbb";
+  uploadArea.style.borderColor = "";
   if (e.dataTransfer.files.length) { csvInput.files = e.dataTransfer.files; handleUpload(); }
 });
 csvInput.addEventListener("change", handleUpload);
@@ -233,13 +309,11 @@ function handleUpload() {
       if (data.error) { alert(data.error); return; }
       state.scanData = data;
 
-      // Show success
       uploadArea.classList.add("hidden");
       document.getElementById("upload-success").classList.remove("hidden");
       document.getElementById("upload-file-info").textContent =
         `${file.name} — ${data.row_count.toLocaleString()} rows × ${data.col_count} columns`;
 
-      // Enable step 2 and populate lists
       document.getElementById("step-select").classList.remove("disabled");
       buildColumnList(data.columns);
       buildMonthList(data.months);
@@ -298,7 +372,6 @@ function buildPreviewTable(preview) {
   table.appendChild(tbody);
 }
 
-// Select all / clear buttons
 document.getElementById("cols-select-all").onclick = () =>
   document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => cb.checked = true);
 document.getElementById("cols-clear").onclick = () =>
@@ -333,7 +406,6 @@ document.getElementById("btn-ingest").onclick = () => {
       document.getElementById("file-label").textContent = document.getElementById("upload-file-info").textContent;
       buildSidebar(data.groups);
 
-      // Hide wizard, show visualiser
       document.getElementById("wizard").classList.add("hidden");
       document.getElementById("toolbar").classList.remove("hidden");
       document.getElementById("main-area").classList.remove("hidden");
@@ -346,7 +418,6 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
   const sb = document.getElementById("sidebar");
   sb.classList.toggle("collapsed");
   this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
-  // Resize chart to fill available space after transition
   setTimeout(() => {
     const chartDiv = document.getElementById("chart");
     if (chartDiv.data) Plotly.Plots.resize(chartDiv);
@@ -433,9 +504,25 @@ function fetchFigure() {
     .then(fig => {
       hideLoading();
       if (fig.error) { alert(fig.error); return; }
+      // Apply dark theme to all axes
+      const layout = Object.assign({}, fig.layout, {
+        paper_bgcolor: DARK_PLOTLY_LAYOUT.paper_bgcolor,
+        plot_bgcolor: DARK_PLOTLY_LAYOUT.plot_bgcolor,
+        font: DARK_PLOTLY_LAYOUT.font,
+      });
+      // Style all x/y axes
+      for (const key of Object.keys(layout)) {
+        if (key.startsWith("xaxis") || key.startsWith("yaxis")) {
+          layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d', zerolinecolor: '#30363d',
+                                                          tickfont: { color: '#8b949e', size: 10 } });
+          if (layout[key].title) layout[key].title.font = { color: '#8b949e', size: 12 };
+        }
+      }
+      if (layout.title) layout.title.font = { color: '#e6edf3', size: 14 };
+
       const chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
-      Plotly.newPlot(chartDiv, fig.data, fig.layout, { responsive: true });
+      Plotly.newPlot(chartDiv, fig.data, layout, { responsive: true });
     })
     .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
 }
