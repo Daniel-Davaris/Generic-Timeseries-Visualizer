@@ -157,16 +157,21 @@
     .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
     .toolbar button.active { background: var(--accent); color: var(--bg-primary); border-color: var(--accent);
                              font-weight: 600; }
-    .toolbar button.primary { background: var(--accent); color: var(--bg-primary); border-color: var(--accent);
-                              font-weight: 600; font-size: 0.82rem; padding: 6px 14px; }
-    .toolbar button.primary:hover { background: #58a6ff; border-color: #58a6ff; }
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; overflow: hidden; }
     .sidebar { width: 300px; min-width: 0; max-height: 85vh; overflow-y: auto;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
-               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s, opacity 0.2s; }
-    .sidebar.collapsed { width: 0; padding: 0; border: none; opacity: 0; overflow: hidden; }
+               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s;
+               position: relative; }
+    .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
+    .sidebar.collapsed .col-group, .sidebar.collapsed .group-btns { display: none; }
+    .toggle-sidebar { position: sticky; top: 0; display: block; background: var(--bg-tertiary);
+                      border: 1px solid var(--border); border-radius: 4px; width: 22px; height: 22px;
+                      display: flex; align-items: center; justify-content: center; margin-left: auto;
+                      cursor: pointer; font-size: 0.65rem; color: var(--text-muted); transition: all 0.15s;
+                      z-index: 2; padding: 0; margin-bottom: 6px; }
+    .toggle-sidebar:hover { color: var(--accent); border-color: var(--accent); }
     .sidebar details { margin-bottom: 4px; }
     .sidebar summary { cursor: pointer; font-weight: 600; padding: 6px 4px; font-size: 0.82rem;
                        color: var(--text-secondary); border-radius: 3px; }
@@ -180,11 +185,6 @@
                      color: var(--text-secondary); border-radius: 3px; }
     .sidebar label:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .sidebar input[type=checkbox] { margin-right: 6px; accent-color: var(--accent); }
-    .toggle-sidebar { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;
-                      padding: 6px 10px; cursor: pointer; font-size: 0.9rem; align-self: flex-start;
-                      flex-shrink: 0; color: var(--text-secondary); transition: all 0.15s; }
-    .toggle-sidebar:hover { color: var(--accent); border-color: var(--accent); }
-
     #chart { flex: 1; min-width: 0; overflow-x: auto; max-width: 100%; background: var(--bg-secondary);
              border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
     .placeholder { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 0.95rem; }
@@ -279,15 +279,15 @@
     <button id="btn-monthly">Monthly</button>
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
-    <button id="btn-apply" class="primary">⚡ Apply selection</button>
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
     <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
     <button id="btn-home" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">🏠 Home</button>
   </div>
 
   <div class="main hidden" id="main-area">
-    <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
-    <div class="sidebar" id="sidebar"></div>
+    <div class="sidebar" id="sidebar">
+      <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
+    </div>
     <div id="chart">
       <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
     </div>
@@ -741,7 +741,9 @@ chartResizeObserver.observe(document.getElementById("chart"));
 
 function buildSidebar(groups) {
   const sb = document.getElementById("sidebar");
+  const toggleBtn = document.getElementById("btn-toggle-sidebar");
   sb.innerHTML = "";
+  sb.appendChild(toggleBtn); // Keep toggle button
   for (const [group, cols] of Object.entries(groups)) {
     const details = document.createElement("details");
     details.className = "col-group";
@@ -754,10 +756,10 @@ function buildSidebar(groups) {
     btns.className = "group-btns";
     const selAll = document.createElement("button");
     selAll.textContent = "Select all";
-    selAll.onclick = () => details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+    selAll.onclick = () => { details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true); fetchFigure(); };
     const clr = document.createElement("button");
     clr.textContent = "Clear";
-    clr.onclick = () => details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+    clr.onclick = () => { details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false); fetchFigure(); };
     btns.append(selAll, clr);
     details.appendChild(btns);
 
@@ -765,6 +767,7 @@ function buildSidebar(groups) {
       const lbl = document.createElement("label");
       const cb = document.createElement("input");
       cb.type = "checkbox"; cb.value = col; cb.name = "col";
+      cb.addEventListener("change", fetchFigure);
       lbl.append(cb, " " + col);
       details.appendChild(lbl);
     }
@@ -790,7 +793,7 @@ document.getElementById("btn-normalise").onclick = function () {
   fetchFigure();
 };
 
-document.getElementById("btn-apply").onclick = () => fetchFigure();
+
 
 // Edit selection: go back to wizard with current scanData and restore current selections
 document.getElementById("btn-edit-selection").onclick = () => {
