@@ -228,7 +228,7 @@
     <div class="wizard-step" id="step-upload">
       <h2><span class="step-num">📄</span> Upload new file</h2>
       <div class="upload-area" id="upload-area">
-        <label for="csv-file">
+        <label>
           <strong>Click to upload</strong> or drag &amp; drop a data file<br>
           <small style="color:var(--text-muted)">Supports CSV, Parquet, and Excel (.xlsx/.xls)</small>
         </label>
@@ -584,7 +584,6 @@ uploadArea.addEventListener("drop", e => {
 });
 uploadArea.addEventListener("click", (e) => {
   if (e.target === csvInput) return;
-  if (e.target.closest("label")) return; // Let label handle it natively
   csvInput.click();
 });
 csvInput.addEventListener("change", handleUpload);
