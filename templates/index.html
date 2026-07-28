@@ -280,7 +280,10 @@
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
     <label style="font-size:.75rem;color:var(--text-muted);margin-left:10px;display:flex;align-items:center;gap:4px;">
-      Y cap <input type="number" id="y-axis-cap" style="width:70px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
+      Y+ <input type="number" id="y-axis-cap" style="width:60px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
+    </label>
+    <label style="font-size:.75rem;color:var(--text-muted);margin-left:4px;display:flex;align-items:center;gap:4px;">
+      Y− <input type="number" id="y-axis-cap-neg" style="width:60px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
     </label>
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
     <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
@@ -847,6 +850,7 @@ document.getElementById("btn-normalise").onclick = function () {
 };
 
 document.getElementById("y-axis-cap").addEventListener("change", fetchFigure);
+document.getElementById("y-axis-cap-neg").addEventListener("change", fetchFigure);
 
 
 
@@ -899,17 +903,26 @@ function fetchFigure() {
       }
       if (layout.title) layout.title.font = { color: '#e6edf3', size: 14 };
 
-      // Apply Y axis cap if set
-      const yCap = parseFloat(document.getElementById("y-axis-cap").value);
-      if (!isNaN(yCap) && yCap > 0) {
+      // Apply Y axis caps if set
+      const yCapPos = parseFloat(document.getElementById("y-axis-cap").value);
+      const yCapNeg = parseFloat(document.getElementById("y-axis-cap-neg").value);
+      const hasPos = !isNaN(yCapPos) && yCapPos > 0;
+      const hasNeg = !isNaN(yCapNeg) && yCapNeg > 0;
+      if (hasPos || hasNeg) {
         for (const key of Object.keys(layout)) {
           if (key.startsWith("yaxis")) {
-            layout[key] = Object.assign({}, layout[key], { range: [-yCap, yCap] });
+            const lo = hasNeg ? -yCapNeg : undefined;
+            const hi = hasPos ? yCapPos : undefined;
+            const range = [lo !== undefined ? lo : (layout[key].range ? layout[key].range[0] : undefined),
+                           hi !== undefined ? hi : (layout[key].range ? layout[key].range[1] : undefined)];
+            if (range[0] !== undefined && range[1] !== undefined) {
+              layout[key] = Object.assign({}, layout[key], { range });
+            }
           }
         }
       }
 
-      // Add red dashed zero lines for each subplot
+      // Add red dotted zero lines for each subplot
       const shapes = layout.shapes ? [...layout.shapes] : [];
       for (const key of Object.keys(layout)) {
         if (key.startsWith("yaxis")) {
@@ -917,7 +930,7 @@ function fetchFigure() {
           shapes.push({
             type: "line", xref: "x" + idx + " domain", yref: key.replace("axis", ""),
             x0: 0, x1: 1, y0: 0, y1: 0,
-            line: { color: "#e74c3c", width: 1, dash: "dot" },
+            line: { color: "#ff0000", width: 0.8, dash: "dashdot" },
           });
         }
       }
