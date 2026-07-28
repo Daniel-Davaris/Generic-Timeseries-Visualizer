@@ -86,6 +86,7 @@
     <button id="btn-apply">Apply selection</button>
     <span id="row-count" style="margin-left:12px;font-size:.85rem;color:#555;font-weight:600"></span>
     <span id="file-label" style="margin-left:auto;font-size:.85rem;color:#888"></span>
+    <button id="btn-new-file" style="margin-left:8px;font-size:.8rem;padding:4px 10px;">📂 New file</button>
   </div>
 
   <div class="main hidden" id="main-area">
@@ -201,6 +202,13 @@ document.getElementById("btn-normalise").onclick = function () {
 };
 
 document.getElementById("btn-apply").onclick = () => fetchFigure();
+
+document.getElementById("btn-new-file").onclick = () => {
+  uploadArea.classList.remove("hidden");
+  document.getElementById("toolbar").classList.add("hidden");
+  document.getElementById("main-area").classList.add("hidden");
+  csvInput.value = "";
+};
 
 // ── Fetch figure ────────────────────────────────────────────────────
 function getSelectedCols() {
