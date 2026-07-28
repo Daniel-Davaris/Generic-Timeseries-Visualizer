@@ -159,7 +159,7 @@
                              font-weight: 600; }
 
     /* Main layout */
-    .main { display: flex; gap: 10px; align-items: stretch; overflow: hidden; }
+    .main { display: flex; gap: 10px; align-items: stretch; overflow: hidden; min-height: 550px; }
     .sidebar { width: 300px; min-width: 0; max-height: 85vh; overflow-y: auto;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
                padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s;
@@ -838,6 +838,7 @@ function fetchFigure() {
 
       const chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
+      layout.height = Math.max(500, chartDiv.clientHeight - 16);
       Plotly.newPlot(chartDiv, fig.data, layout, { responsive: true });
     })
     .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
