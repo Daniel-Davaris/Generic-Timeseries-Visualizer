@@ -512,7 +512,7 @@ function buildColumnList(columns) {
   columns.forEach(col => {
     const lbl = document.createElement("label");
     const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.value = col; cb.checked = true;
+    cb.type = "checkbox"; cb.value = col; cb.checked = false;
     cb.addEventListener("change", updatePreview);
     lbl.append(cb, " " + col);
     frag.appendChild(lbl);
