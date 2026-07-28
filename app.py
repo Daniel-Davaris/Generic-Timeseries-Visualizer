@@ -276,7 +276,7 @@ def upload():
     _set_dataset(sid, df, date_col, event_cols)
 
     ds = _get_dataset(sid)
-    return jsonify(groups=ds["groups"])
+    return jsonify(groups=ds["groups"], row_count=len(df), col_count=len(df.columns))
 
 
 @app.route("/api/figure", methods=["POST"])

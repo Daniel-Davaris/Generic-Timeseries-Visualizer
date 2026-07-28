@@ -84,6 +84,7 @@
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
     <button id="btn-apply">Apply selection</button>
+    <span id="row-count" style="margin-left:12px;font-size:.85rem;color:#555;font-weight:600"></span>
     <span id="file-label" style="margin-left:auto;font-size:.85rem;color:#888"></span>
   </div>
 
@@ -129,6 +130,7 @@ function handleUpload() {
       if (data.error) { alert(data.error); return; }
       state.groups = data.groups;
       document.getElementById("file-label").textContent = file.name;
+      document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows × ${data.col_count} columns`;
       buildSidebar(data.groups);
       uploadArea.classList.add("hidden");
       document.getElementById("toolbar").classList.remove("hidden");
