@@ -346,6 +346,11 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
   const sb = document.getElementById("sidebar");
   sb.classList.toggle("collapsed");
   this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
+  // Resize chart to fill available space after transition
+  setTimeout(() => {
+    const chartDiv = document.getElementById("chart");
+    if (chartDiv.data) Plotly.Plots.resize(chartDiv);
+  }, 250);
 };
 
 function buildSidebar(groups) {
