@@ -8,7 +8,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f5f6fa; color: #222; }
-    .container { max-width: 1820px; margin: 0 auto; padding: 16px; }
+    .container { max-width: 100%; margin: 0 auto; padding: 16px; overflow-x: hidden; }
     h1 { font-size: 1.4rem; margin-bottom: 12px; }
 
     /* Upload area */
@@ -28,11 +28,14 @@
                       background: #fff; cursor: pointer; font-size: 0.9rem; }
     .toolbar button:hover { background: #e8e8e8; }
     .toolbar button.active { background: #636EFA; color: #fff; border-color: #636EFA; }
+    .toolbar button.primary { background: #00CC96; color: #fff; border-color: #00CC96;
+                              font-weight: 700; font-size: 0.95rem; padding: 8px 22px; }
+    .toolbar button.primary:hover { background: #00b386; border-color: #00b386; }
 
     /* Main layout */
-    .main { display: flex; gap: 12px; align-items: flex-start; }
+    .main { display: flex; gap: 12px; align-items: flex-start; overflow: hidden; }
     .sidebar { width: 340px; min-width: 260px; max-height: 85vh; overflow-y: auto;
-               background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+               background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; flex-shrink: 0; }
     .sidebar details { margin-bottom: 6px; }
     .sidebar summary { cursor: pointer; font-weight: 600; padding: 4px; }
     .sidebar .group-btns { display: flex; gap: 4px; margin: 4px 0; }
@@ -41,7 +44,7 @@
     .sidebar label { display: block; padding: 2px 0; font-size: 0.85rem; cursor: pointer; }
     .sidebar input[type=checkbox] { margin-right: 6px; }
 
-    #chart { flex: 1; min-width: 0; }
+    #chart { flex: 1; min-width: 0; overflow-x: auto; max-width: 100%; }
     .placeholder { text-align: center; color: #999; padding: 60px 20px; font-size: 1.1rem; }
 
     /* Loading indicator */
@@ -83,7 +86,7 @@
     <button id="btn-monthly">Monthly</button>
     <button id="btn-yearly" class="active">Yearly</button>
     <button id="btn-normalise">Show normalised</button>
-    <button id="btn-apply">Apply selection</button>
+    <button id="btn-apply" class="primary">Apply selection</button>
     <span id="row-count" style="margin-left:12px;font-size:.85rem;color:#555;font-weight:600"></span>
     <span id="file-label" style="margin-left:auto;font-size:.85rem;color:#888"></span>
     <button id="btn-new-file" style="margin-left:8px;font-size:.8rem;padding:4px 10px;">📂 New file</button>

@@ -175,8 +175,8 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
     dtick, tickformat = _get_tick_settings(period)
 
     fig.update_layout(
-        height=total_height, width=1700,
-        margin=dict(l=55, r=40, t=80, b=90), autosize=False,
+        height=total_height,
+        margin=dict(l=55, r=40, t=80, b=90), autosize=True,
         title=dict(
             text=f"{period} – {'Normalised within each graph' if normalised else 'Raw'}",
             font=dict(size=15),
