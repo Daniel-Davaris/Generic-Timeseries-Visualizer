@@ -13,8 +13,8 @@
     .hidden { display: none !important; }
 
     /* Wizard */
-    .wizard { max-width: 900px; margin: 0 auto; }
-    .wizard-step { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 28px; margin-bottom: 16px; }
+    .wizard { max-width: 1000px; margin: 0 auto; }
+    .wizard-step { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 16px; }
     .wizard-step h2 { font-size: 1.1rem; margin-bottom: 12px; color: #333; }
     .wizard-step .step-num { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center;
                              background: #636EFA; color: #fff; border-radius: 50%; font-size: 0.85rem; font-weight: 700;
@@ -31,16 +31,29 @@
                       border: 1px solid #00CC96; border-radius: 6px; font-size: 0.9rem; color: #1a7a5a; }
     .upload-success .file-info { font-weight: 600; }
 
-    /* Config section */
-    .config-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
-    .config-row .field { flex: 1; min-width: 200px; }
+    /* Selection panels */
+    .select-panels { display: flex; gap: 16px; flex-wrap: wrap; }
+    .select-panel { flex: 1; min-width: 280px; }
+    .select-panel h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; color: #444; }
+    .select-panel .panel-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+    .select-panel .panel-actions button { font-size: 0.75rem; padding: 2px 8px; border: 1px solid #ccc;
+                                          border-radius: 3px; background: #f9f9f9; cursor: pointer; }
+    .select-list { max-height: 350px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 6px;
+                   background: #fafafa; }
+    .select-list label { display: block; padding: 3px 4px; font-size: 0.83rem; cursor: pointer; border-radius: 3px; }
+    .select-list label:hover { background: #e8ecff; }
+    .select-list input[type=checkbox] { margin-right: 6px; }
+
+    /* Config row */
+    .config-row { margin-top: 14px; }
     .config-row label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: #444; }
-    .config-row input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    .config-row input[type=text] { width: 100%; max-width: 500px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
 
     /* Preview table */
-    .preview-wrap { overflow-x: auto; margin-top: 12px; }
-    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .preview-table th, .preview-table td { padding: 5px 8px; border: 1px solid #ddd; text-align: left; white-space: nowrap; }
+    .preview-wrap { overflow-x: auto; margin-top: 14px; }
+    .preview-wrap h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; color: #444; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .preview-table th, .preview-table td { padding: 4px 8px; border: 1px solid #ddd; text-align: left; white-space: nowrap; }
     .preview-table th { background: #f0f2f8; font-weight: 600; position: sticky; top: 0; }
     .preview-table tr:nth-child(even) { background: #fafafa; }
 
@@ -48,8 +61,6 @@
     .wizard-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .btn { padding: 8px 20px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
     .btn:hover { background: #e8e8e8; }
-    .btn-primary { background: #636EFA; color: #fff; border-color: #636EFA; font-weight: 600; }
-    .btn-primary:hover { background: #4f5bd5; }
     .btn-go { background: #00CC96; color: #fff; border-color: #00CC96; font-weight: 700; font-size: 1rem; padding: 10px 28px; }
     .btn-go:hover { background: #00b386; }
 
@@ -122,28 +133,41 @@
       </div>
     </div>
 
-    <!-- Step 2: Configure & Preview -->
-    <div class="wizard-step disabled" id="step-configure">
-      <h2><span class="step-num">2</span> Configure &amp; preview</h2>
-      <div class="config-row">
-        <div class="field">
-          <label for="event-cols">Event columns <small>(comma-separated, optional)</small></label>
-          <input type="text" id="event-cols" placeholder="">
+    <!-- Step 2: Select columns & date periods -->
+    <div class="wizard-step disabled" id="step-select">
+      <h2><span class="step-num">2</span> Select columns &amp; date range to ingest</h2>
+
+      <div class="select-panels">
+        <div class="select-panel">
+          <h3>Columns</h3>
+          <div class="panel-actions">
+            <button id="cols-select-all">Select all</button>
+            <button id="cols-clear">Clear</button>
+          </div>
+          <div class="select-list" id="col-list"></div>
         </div>
-        <div class="field">
-          <label for="wiz-date-start">Start date</label>
-          <input type="date" id="wiz-date-start">
-        </div>
-        <div class="field">
-          <label for="wiz-date-end">End date</label>
-          <input type="date" id="wiz-date-end">
+        <div class="select-panel">
+          <h3>Date periods (months)</h3>
+          <div class="panel-actions">
+            <button id="months-select-all">Select all</button>
+            <button id="months-clear">Clear</button>
+          </div>
+          <div class="select-list" id="month-list"></div>
         </div>
       </div>
-      <div class="preview-wrap" id="preview-wrap">
+
+      <div class="config-row">
+        <label for="event-cols">Event columns <small>(comma-separated, optional)</small></label>
+        <input type="text" id="event-cols">
+      </div>
+
+      <div class="preview-wrap">
+        <h3>Preview (first 10 rows)</h3>
         <table class="preview-table" id="preview-table"></table>
       </div>
+
       <div class="wizard-actions">
-        <button class="btn-go" id="btn-start-viz">Start visualising →</button>
+        <button class="btn-go" id="btn-ingest">Load selected data →</button>
       </div>
     </div>
   </div>
@@ -170,9 +194,8 @@
 </div>
 
 <script>
-const state = { period: "Yearly", normalised: false, groups: null, uploadData: null };
+const state = { period: "Yearly", normalised: false, groups: null, scanData: null };
 
-// ── Helpers ─────────────────────────────────────────────────────────
 function showLoading(msg) { document.getElementById("loading-text").textContent = msg; document.getElementById("loading").classList.add("visible"); }
 function hideLoading() { document.getElementById("loading").classList.remove("visible"); }
 
@@ -192,46 +215,67 @@ csvInput.addEventListener("change", handleUpload);
 document.getElementById("btn-change-file").onclick = () => {
   uploadArea.classList.remove("hidden");
   document.getElementById("upload-success").classList.add("hidden");
-  document.getElementById("step-configure").classList.add("disabled");
+  document.getElementById("step-select").classList.add("disabled");
   csvInput.value = "";
 };
 
 function handleUpload() {
   const file = csvInput.files[0];
   if (!file) return;
-  showLoading("Uploading and processing file…");
+  showLoading("Scanning file…");
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("event_cols", document.getElementById("event-cols").value);
 
   fetch("/api/upload", { method: "POST", body: fd })
     .then(r => r.json())
     .then(data => {
       hideLoading();
       if (data.error) { alert(data.error); return; }
-      state.uploadData = data;
-      state.groups = data.groups;
+      state.scanData = data;
 
-      // Show success, hide drop zone
+      // Show success
       uploadArea.classList.add("hidden");
-      const successEl = document.getElementById("upload-success");
-      successEl.classList.remove("hidden");
+      document.getElementById("upload-success").classList.remove("hidden");
       document.getElementById("upload-file-info").textContent =
         `${file.name} — ${data.row_count.toLocaleString()} rows × ${data.col_count} columns`;
 
-      // Enable step 2
-      document.getElementById("step-configure").classList.remove("disabled");
-      document.getElementById("wiz-date-start").value = data.date_min;
-      document.getElementById("wiz-date-end").value = data.date_max;
+      // Enable step 2 and populate lists
+      document.getElementById("step-select").classList.remove("disabled");
+      buildColumnList(data.columns);
+      buildMonthList(data.months);
       buildPreviewTable(data.preview);
     })
     .catch(err => { hideLoading(); alert("Upload failed: " + err); });
 }
 
+// ── Wizard Step 2: Column & Month selection ─────────────────────────
+function buildColumnList(columns) {
+  const list = document.getElementById("col-list");
+  list.innerHTML = "";
+  columns.forEach(col => {
+    const lbl = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = col; cb.checked = true;
+    lbl.append(cb, " " + col);
+    list.appendChild(lbl);
+  });
+}
+
+function buildMonthList(months) {
+  const list = document.getElementById("month-list");
+  list.innerHTML = "";
+  months.forEach(m => {
+    const lbl = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = m; cb.checked = true;
+    lbl.append(cb, " " + m);
+    list.appendChild(lbl);
+  });
+}
+
 function buildPreviewTable(preview) {
   const table = document.getElementById("preview-table");
   table.innerHTML = "";
-  // Header
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
   preview.columns.forEach(col => {
@@ -241,7 +285,6 @@ function buildPreviewTable(preview) {
   });
   thead.appendChild(headerRow);
   table.appendChild(thead);
-  // Body
   const tbody = document.createElement("tbody");
   preview.data.forEach(row => {
     const tr = document.createElement("tr");
@@ -255,30 +298,47 @@ function buildPreviewTable(preview) {
   table.appendChild(tbody);
 }
 
-// ── Wizard Step 2: Start visualising ────────────────────────────────
-document.getElementById("btn-start-viz").onclick = () => {
-  const data = state.uploadData;
-  if (!data) return;
+// Select all / clear buttons
+document.getElementById("cols-select-all").onclick = () =>
+  document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => cb.checked = true);
+document.getElementById("cols-clear").onclick = () =>
+  document.querySelectorAll("#col-list input[type=checkbox]").forEach(cb => cb.checked = false);
+document.getElementById("months-select-all").onclick = () =>
+  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = true);
+document.getElementById("months-clear").onclick = () =>
+  document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => cb.checked = false);
 
-  // Update event cols if changed
-  const eventColsVal = document.getElementById("event-cols").value;
-  if (eventColsVal) {
-    showLoading("Applying settings…");
-    const fd = new FormData();
-    // Re-upload isn't needed — just re-send to set event cols
-    // Actually we need to re-upload. For simplicity, proceed with existing data.
-    hideLoading();
-  }
+// Ingest button
+document.getElementById("btn-ingest").onclick = () => {
+  const selectedCols = [...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value);
+  const selectedMonths = [...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value);
+  const eventCols = document.getElementById("event-cols").value;
 
-  document.getElementById("file-label").textContent = document.getElementById("upload-file-info").textContent;
-  document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows`;
+  if (selectedCols.length === 0) { alert("Please select at least one column."); return; }
+  if (selectedMonths.length === 0) { alert("Please select at least one date period."); return; }
 
-  buildSidebar(data.groups);
+  showLoading("Loading selected data…");
+  fetch("/api/ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ columns: selectedCols, months: selectedMonths, event_cols: eventCols }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      hideLoading();
+      if (data.error) { alert(data.error); return; }
+      state.groups = data.groups;
 
-  // Hide wizard, show visualiser
-  document.getElementById("wizard").classList.add("hidden");
-  document.getElementById("toolbar").classList.remove("hidden");
-  document.getElementById("main-area").classList.remove("hidden");
+      document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows`;
+      document.getElementById("file-label").textContent = document.getElementById("upload-file-info").textContent;
+      buildSidebar(data.groups);
+
+      // Hide wizard, show visualiser
+      document.getElementById("wizard").classList.add("hidden");
+      document.getElementById("toolbar").classList.remove("hidden");
+      document.getElementById("main-area").classList.remove("hidden");
+    })
+    .catch(err => { hideLoading(); alert("Ingest failed: " + err); });
 };
 
 // ── Sidebar ─────────────────────────────────────────────────────────
@@ -291,7 +351,6 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
 function buildSidebar(groups) {
   const sb = document.getElementById("sidebar");
   sb.innerHTML = "";
-
   for (const [group, cols] of Object.entries(groups)) {
     const details = document.createElement("details");
     details.className = "col-group";
@@ -342,15 +401,14 @@ document.getElementById("btn-normalise").onclick = function () {
 document.getElementById("btn-apply").onclick = () => fetchFigure();
 
 document.getElementById("btn-new-file").onclick = () => {
-  // Reset wizard
   document.getElementById("wizard").classList.remove("hidden");
   document.getElementById("toolbar").classList.add("hidden");
   document.getElementById("main-area").classList.add("hidden");
   uploadArea.classList.remove("hidden");
   document.getElementById("upload-success").classList.add("hidden");
-  document.getElementById("step-configure").classList.add("disabled");
+  document.getElementById("step-select").classList.add("disabled");
   csvInput.value = "";
-  state.uploadData = null;
+  state.scanData = null;
 };
 
 // ── Fetch figure ────────────────────────────────────────────────────
@@ -360,13 +418,11 @@ function getSelectedCols() {
 
 function fetchFigure() {
   const cols = getSelectedCols();
-  const dateStart = document.getElementById("wiz-date-start").value || null;
-  const dateEnd = document.getElementById("wiz-date-end").value || null;
   showLoading("Generating chart…");
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols, date_start: dateStart, date_end: dateEnd }),
+    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols }),
   })
     .then(r => r.json())
     .then(fig => {

@@ -251,6 +251,7 @@ def index():
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
+    """Phase 1: Save file and scan metadata (columns + date periods)."""
     file = request.files.get("file")
     if not file:
         return jsonify(error="No file provided"), 400
@@ -268,23 +269,62 @@ def upload():
     except Exception as exc:
         return jsonify(error=str(exc)), 400
 
-    event_cols_input = request.form.get("event_cols", "")
-    event_cols = set(c.strip() for c in event_cols_input.split(",") if c.strip())
-
+    # Store minimal scan info in session
     sid = os.urandom(8).hex()
     session["dataset_id"] = sid
+    session["dataset_path"] = path
+    session["date_col"] = date_col
+
+    # Compute available months/years
+    months = sorted(df[date_col].dt.to_period("M").unique())
+    month_list = [str(m) for m in months]
+
+    columns = [c for c in df.columns if c != date_col]
+    preview = df.head(10).to_dict(orient="split")
+
+    return jsonify(
+        date_col=date_col,
+        columns=columns,
+        months=month_list,
+        row_count=len(df),
+        col_count=len(df.columns),
+        preview={"columns": preview["columns"], "data": preview["data"]},
+    )
+
+
+@app.route("/api/ingest", methods=["POST"])
+def ingest():
+    """Phase 2: Load only selected columns and date periods."""
+    sid = session.get("dataset_id")
+    path = session.get("dataset_path")
+    date_col = session.get("date_col")
+    if not sid or not path:
+        return jsonify(error="No file uploaded yet"), 400
+
+    data = request.get_json(force=True)
+    selected_cols = data.get("columns", [])
+    selected_months = set(data.get("months", []))
+    event_cols_input = data.get("event_cols", "")
+    event_cols = set(c.strip() for c in event_cols_input.split(",") if c.strip())
+
+    try:
+        df, date_col = _load_file(path)
+    except Exception as exc:
+        return jsonify(error=str(exc)), 400
+
+    # Filter to selected months
+    if selected_months:
+        df_periods = df[date_col].dt.to_period("M").astype(str)
+        df = df[df_periods.isin(selected_months)]
+
+    # Keep only selected columns + date column
+    keep_cols = [date_col] + [c for c in selected_cols if c in df.columns]
+    df = df[keep_cols].reset_index(drop=True)
+
     _set_dataset(sid, df, date_col, event_cols)
 
     ds = _get_dataset(sid)
-    date_col = ds["date_col"]
-    date_min = str(ds["df"][date_col].min().date())
-    date_max = str(ds["df"][date_col].max().date())
-    preview = ds["df"].head(10).to_dict(orient="split")
-    return jsonify(
-        groups=ds["groups"], row_count=len(df), col_count=len(df.columns),
-        date_col=date_col, date_min=date_min, date_max=date_max,
-        preview={"columns": preview["columns"], "data": preview["data"]},
-    )
+    return jsonify(groups=ds["groups"], row_count=len(df), col_count=len(df.columns))
 
 
 @app.route("/api/figure", methods=["POST"])
@@ -298,24 +338,9 @@ def figure():
     period = data.get("period", "Yearly")
     normalised = bool(data.get("normalised", False))
     selected_cols = data.get("selected_cols", [])
-    date_start = data.get("date_start")
-    date_end = data.get("date_end")
-
-    df = ds["df"]
-    raw_series = ds["raw_series"]
-    date_col = ds["date_col"]
-
-    if date_start or date_end:
-        mask = pd.Series(True, index=df.index)
-        if date_start:
-            mask &= df[date_col] >= pd.to_datetime(date_start)
-        if date_end:
-            mask &= df[date_col] <= pd.to_datetime(date_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        df = df[mask]
-        raw_series = {col: s.loc[df.index] for col, s in raw_series.items()}
 
     fig = build_figure(
-        df, date_col, raw_series, ds["event_cols"],
+        ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
         ds["colors"], period, normalised, selected_cols,
     )
     return jsonify(json.loads(plotly.io.to_json(fig)))
