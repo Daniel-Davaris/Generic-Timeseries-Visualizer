@@ -249,11 +249,6 @@
         </div>
       </div>
 
-      <div class="config-row">
-        <label for="event-cols">Event columns <small style="text-transform:none;letter-spacing:0">(comma-separated, optional)</small></label>
-        <input type="text" id="event-cols">
-      </div>
-
       <div class="preview-wrap">
         <h3>Preview (first 10 rows)</h3>
         <table class="preview-table" id="preview-table"></table>
@@ -458,7 +453,7 @@ function showWizardWithRestore(data, entry) {
     document.querySelectorAll("#month-list input[type=checkbox]").forEach(cb => {
       cb.checked = monthSet.has(cb.value);
     });
-    if (entry.eventCols) document.getElementById("event-cols").value = entry.eventCols;
+    if (entry.eventCols) {}
   }
   updatePreview();
 }
@@ -597,7 +592,7 @@ document.getElementById("btn-back-home").onclick = () => { showView("home"); ren
 document.getElementById("btn-ingest").onclick = () => {
   const selectedCols = [...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value);
   const selectedMonths = [...document.querySelectorAll("#month-list input:checked")].map(cb => cb.value);
-  const eventCols = document.getElementById("event-cols").value;
+  const eventCols = "";
 
   if (selectedCols.length === 0) { alert("Please select at least one column."); return; }
   if (selectedMonths.length === 0) { alert("Please select at least one date period."); return; }
@@ -606,7 +601,7 @@ document.getElementById("btn-ingest").onclick = () => {
   fetch("/api/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ columns: selectedCols, months: selectedMonths, event_cols: eventCols }),
+    body: JSON.stringify({ columns: selectedCols, months: selectedMonths, event_cols: "" }),
   })
     .then(r => r.json())
     .then(data => {
