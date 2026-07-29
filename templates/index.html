@@ -952,8 +952,42 @@ function getSelectedCols() {
 }
 
 function fetchFigure() {
-  const cols = getSelectedCols();
+  var cols = getSelectedCols();
   showLoading("Generating chart…");
+
+  // Check server cache first
+  fetch("/api/check-cache", { method: "GET", credentials: "same-origin" })
+    .then(function(r) { return r.json(); })
+    .then(function(cacheResult) {
+      if (cacheResult.cached) {
+        return doFetchFigure(cols);
+      }
+      // Re-upload from IndexedDB
+      showLoading("Re-uploading file…");
+      return getFile(state.currentFile).then(function(blob) {
+        if (!blob) { hideLoading(); alert("File no longer cached. Please upload again."); return; }
+        var fd = new FormData();
+        fd.append("file", blob, state.currentFile);
+        return uploadWithProgress(fd).then(function(uploadData) {
+          if (uploadData.error) { hideLoading(); alert(uploadData.error); return; }
+          state.scanData = uploadData;
+          // Re-ingest with current selections
+          var entry = getMemory().find(function(e) { return e.filename === state.currentFile; });
+          var ingestBody = { selected_columns: entry ? entry.columns : [], selected_months: entry ? entry.months : [] };
+          return fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ingestBody) })
+            .then(function(r) { return r.json(); })
+            .then(function(ingestData) {
+              if (ingestData.error) { hideLoading(); alert(ingestData.error); return; }
+              state.groups = ingestData.groups;
+              return doFetchFigure(cols);
+            });
+        });
+      });
+    })
+    .catch(function(err) { hideLoading(); alert("Error: " + err); });
+}
+
+function doFetchFigure(cols) {
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
