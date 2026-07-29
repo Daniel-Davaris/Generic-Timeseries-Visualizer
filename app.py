@@ -192,10 +192,15 @@ def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
 
 
 def build_figure(df, date_col, raw_series, event_cols, series_colors,
-                 period, normalised, selected_cols):
+                 period, normalised, selected_cols, page=1, page_size=10):
     fig = go.Figure()
     groups = _get_groups(df, date_col, period)
-    n_groups = max(1, len(groups))
+    total_groups = len(groups)
+    n_pages = max(1, -(-total_groups // page_size))  # ceil division
+    page = max(1, min(page, n_pages))
+    start = (page - 1) * page_size
+    page_groups = groups[start:start + page_size]
+    n_groups = max(1, len(page_groups))
     total_height = _get_total_height(n_groups)
     dtick, tickformat = _get_tick_settings(period)
 
@@ -210,7 +215,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
         grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.22),
     )
 
-    for row_idx, (title, df_part, period_start, period_end) in enumerate(groups, start=1):
+    for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
         y_min, y_max = _y_range(df_part, selected_cols, raw_series, event_cols, normalised)
 
@@ -244,7 +249,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
                     legendgroup=col, showlegend=(row_idx == 1),
                 ))
 
-    return fig
+    return fig, total_groups, n_pages, page
 
 
 # In-memory store keyed by session id
@@ -395,13 +400,22 @@ def figure():
     period = data.get("period", "Yearly")
     normalised = bool(data.get("normalised", False))
     selected_cols = data.get("selected_cols", [])
+    page = int(data.get("page", 1))
+    page_size = int(data.get("page_size", 10))
 
-    fig = build_figure(
+    fig, total_groups, n_pages, current_page = build_figure(
         ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
-        ds["colors"], period, normalised, selected_cols,
+        ds["colors"], period, normalised, selected_cols, page, page_size,
     )
-    # Return pre-serialized JSON directly (skip double parse)
-    return Response(plotly.io.to_json(fig), mimetype="application/json")
+    # Serialize figure and add pagination metadata
+    fig_json = json.loads(plotly.io.to_json(fig))
+    fig_json["_pagination"] = {
+        "page": current_page,
+        "n_pages": n_pages,
+        "total_groups": total_groups,
+        "page_size": page_size,
+    }
+    return Response(json.dumps(fig_json), mimetype="application/json")
 
 
 if __name__ == "__main__":

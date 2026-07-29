@@ -188,6 +188,12 @@
     #chart { flex: 1; min-width: 0; min-height: 500px; overflow: auto; max-width: 100%; background: var(--bg-secondary);
              border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 85vh; }
     .placeholder { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 0.95rem; }
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0; }
+    .pagination button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
+      padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination span { color: var(--text-secondary); font-size: 0.85rem; }
 
     /* Loading indicator */
     .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.9);
@@ -296,6 +302,11 @@
     <div id="chart">
       <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
     </div>
+    <div id="pagination" class="pagination hidden">
+      <button id="page-prev">← Prev</button>
+      <span id="page-info">Page 1 of 1</span>
+      <button id="page-next">Next →</button>
+    </div>
   </div>
 </div>
 
@@ -308,7 +319,7 @@ const DARK_PLOTLY_LAYOUT = {
   yaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
 };
 
-const state = { period: "Yearly", normalised: false, groups: null, scanData: null, currentFile: null };
+const state = { period: "Yearly", normalised: false, groups: null, scanData: null, currentFile: null, page: 1 };
 
 // ── IndexedDB for file blob caching ─────────────────────────────────
 const DB_NAME = "signal_analyser_files";
@@ -832,7 +843,8 @@ function buildSidebar(groups) {
 // ── Toolbar ─────────────────────────────────────────────────────────
 function setPeriod(p) {
   state.period = p;
-  document.querySelectorAll("#btn-weekly,#btn-monthly,#btn-yearly").forEach(b => b.classList.remove("active"));
+  state.page = 1;
+  document.querySelectorAll("#btn-weekly,#btn-monthly,#btn-yearly").forEach(function(b) { b.classList.remove("active"); });
   document.getElementById("btn-" + p.toLowerCase()).classList.add("active");
 }
 
@@ -874,18 +886,33 @@ function fetchFigure() {
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols }),
+    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols, page: state.page }),
   })
-    .then(r => r.json())
-    .then(fig => {
+    .then(function(r) { return r.json(); })
+    .then(function(fig) {
       hideLoading();
       if (fig.error) { alert(fig.error); return; }
-      const layout = Object.assign({}, fig.layout, {
+
+      // Handle pagination metadata
+      var pag = fig._pagination || { page: 1, n_pages: 1, total_groups: 0 };
+      delete fig._pagination;
+      state.page = pag.page;
+      var pagDiv = document.getElementById("pagination");
+      if (pag.n_pages > 1) {
+        pagDiv.classList.remove("hidden");
+        document.getElementById("page-info").textContent = "Page " + pag.page + " of " + pag.n_pages + " (" + pag.total_groups + " plots)";
+        document.getElementById("page-prev").disabled = pag.page <= 1;
+        document.getElementById("page-next").disabled = pag.page >= pag.n_pages;
+      } else {
+        pagDiv.classList.add("hidden");
+      }
+
+      var layout = Object.assign({}, fig.layout, {
         paper_bgcolor: DARK_PLOTLY_LAYOUT.paper_bgcolor,
         plot_bgcolor: DARK_PLOTLY_LAYOUT.plot_bgcolor,
         font: DARK_PLOTLY_LAYOUT.font,
       });
-      for (const key of Object.keys(layout)) {
+      for (var key of Object.keys(layout)) {
         if (key.startsWith("xaxis")) {
           layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d', zerolinecolor: '#30363d',
                                                           tickfont: { color: '#8b949e', size: 10 } });
@@ -902,29 +929,29 @@ function fetchFigure() {
       if (layout.title) layout.title.font = { color: '#e6edf3', size: 14 };
 
       // Apply Y axis caps if set
-      const yCapPos = parseFloat(document.getElementById("y-axis-cap").value);
-      const yCapNeg = parseFloat(document.getElementById("y-axis-cap-neg").value);
-      const hasPos = !isNaN(yCapPos) && yCapPos > 0;
-      const hasNeg = !isNaN(yCapNeg) && yCapNeg > 0;
+      var yCapPos = parseFloat(document.getElementById("y-axis-cap").value);
+      var yCapNeg = parseFloat(document.getElementById("y-axis-cap-neg").value);
+      var hasPos = !isNaN(yCapPos) && yCapPos > 0;
+      var hasNeg = !isNaN(yCapNeg) && yCapNeg > 0;
       if (hasPos || hasNeg) {
-        for (const key of Object.keys(layout)) {
+        for (var key of Object.keys(layout)) {
           if (key.startsWith("yaxis")) {
-            const lo = hasNeg ? -yCapNeg : undefined;
-            const hi = hasPos ? yCapPos : undefined;
-            const range = [lo !== undefined ? lo : (layout[key].range ? layout[key].range[0] : undefined),
+            var lo = hasNeg ? -yCapNeg : undefined;
+            var hi = hasPos ? yCapPos : undefined;
+            var range = [lo !== undefined ? lo : (layout[key].range ? layout[key].range[0] : undefined),
                            hi !== undefined ? hi : (layout[key].range ? layout[key].range[1] : undefined)];
             if (range[0] !== undefined && range[1] !== undefined) {
-              layout[key] = Object.assign({}, layout[key], { range });
+              layout[key] = Object.assign({}, layout[key], { range: range });
             }
           }
         }
       }
 
       // Add red dotted zero lines for each subplot
-      const shapes = layout.shapes ? [...layout.shapes] : [];
-      for (const key of Object.keys(layout)) {
+      var shapes = layout.shapes ? layout.shapes.slice() : [];
+      for (var key of Object.keys(layout)) {
         if (key.startsWith("yaxis")) {
-          const idx = key === "yaxis" ? "" : key.replace("yaxis", "");
+          var idx = key === "yaxis" ? "" : key.replace("yaxis", "");
           shapes.push({
             type: "line", xref: "x" + idx + " domain", yref: key.replace("axis", ""),
             x0: 0, x1: 1, y0: 0, y1: 0,
@@ -934,15 +961,17 @@ function fetchFigure() {
       }
       layout.shapes = shapes;
 
-      const chartDiv = document.getElementById("chart");
+      var chartDiv = document.getElementById("chart");
       chartDiv.innerHTML = "";
-      // Use the figure's height if it's larger (for multi-subplot views like weekly)
-      const figHeight = layout.height || 500;
+      var figHeight = layout.height || 500;
       layout.height = Math.max(500, figHeight);
       Plotly.newPlot(chartDiv, fig.data, layout, { responsive: false });
     })
-    .catch(err => { hideLoading(); console.error("Figure fetch failed:", err); });
+    .catch(function(err) { hideLoading(); console.error("Figure fetch failed:", err); });
 }
+
+document.getElementById("page-prev").onclick = function() { state.page = Math.max(1, state.page - 1); fetchFigure(); };
+document.getElementById("page-next").onclick = function() { state.page++; fetchFigure(); };
 
 // ── Init ────────────────────────────────────────────────────────────
 renderHomepage();
