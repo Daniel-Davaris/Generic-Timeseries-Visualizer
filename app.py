@@ -138,10 +138,10 @@ def _get_groups(df, date_col, period):
 
 def _get_total_height(n):
     if n <= 4:
-        return max(800, 320 * n)
+        return max(600, 280 * n)
     if n <= 12:
-        return max(800, 230 * n)
-    return min(7500, max(800, 150 * n))
+        return max(600, 200 * n)
+    return min(6000, max(600, 140 * n))
 
 
 def _get_tick_settings(period):
@@ -206,9 +206,11 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
     fig.update_layout(
         height=total_height,
-        margin=dict(l=55, r=40, t=30, b=90), autosize=True,
+        margin=dict(l=40, r=10, t=10, b=30), autosize=True,
         font=dict(size=11),
-        grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.22),
+        grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.08),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom",
+                    font=dict(size=10)),
     )
 
     for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
@@ -217,8 +219,8 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
         xaxis_settings = dict(
             anchor=f"y{axis_suffix}",
-            title=dict(text=title, font=dict(size=13), standoff=12),
-            tickfont=dict(size=11), tickangle=0, automargin=True,
+            title=dict(text=title, font=dict(size=11), standoff=4),
+            tickfont=dict(size=10), tickangle=0, automargin=True,
             range=[period_start, period_end], tickformat=tickformat,
         )
         if dtick is not None:
@@ -227,7 +229,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
         fig.layout[f"xaxis{axis_suffix}"] = xaxis_settings
         fig.layout[f"yaxis{axis_suffix}"] = dict(
-            anchor=f"x{axis_suffix}", tickfont=dict(size=11),
+            anchor=f"x{axis_suffix}", tickfont=dict(size=10),
             automargin=True, range=[y_min, y_max],
         )
 
