@@ -161,10 +161,10 @@
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; }
-    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 54px); overflow-y: auto;
+    .sidebar { width: 150px; min-width: 0; max-height: calc(100vh - 54px); overflow-y: auto;
               position: sticky; top: 54px; align-self: flex-start;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
-               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
+               padding: 4px 6px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
     .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
     .sidebar.collapsed .col-group, .sidebar.collapsed .group-btns { display: none; }
     .toggle-sidebar { position: sticky; top: 0; display: block; background: var(--bg-tertiary);
@@ -838,38 +838,34 @@ const chartResizeObserver = new ResizeObserver(() => {
 chartResizeObserver.observe(document.getElementById("chart"));
 
 function buildSidebar(groups) {
-  const sb = document.getElementById("sidebar");
-  const toggleBtn = document.getElementById("btn-toggle-sidebar");
+  var sb = document.getElementById("sidebar");
+  var toggleBtn = document.getElementById("btn-toggle-sidebar");
   sb.innerHTML = "";
-  sb.appendChild(toggleBtn); // Keep toggle button
-  for (const [group, cols] of Object.entries(groups)) {
-    const details = document.createElement("details");
-    details.className = "col-group";
-    details.open = true;
-    const summary = document.createElement("summary");
-    summary.textContent = group;
-    details.appendChild(summary);
+  sb.appendChild(toggleBtn);
 
-    const btns = document.createElement("div");
-    btns.className = "group-btns";
-    const selAll = document.createElement("button");
-    selAll.textContent = "Select all";
-    selAll.onclick = () => { details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true); fetchFigure(); };
-    const clr = document.createElement("button");
-    clr.textContent = "Clear";
-    clr.onclick = () => { details.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false); fetchFigure(); };
-    btns.append(selAll, clr);
-    details.appendChild(btns);
+  // Single select all / clear buttons
+  var btns = document.createElement("div");
+  btns.className = "group-btns";
+  var selAll = document.createElement("button");
+  selAll.textContent = "All";
+  selAll.onclick = function() { sb.querySelectorAll("input[type=checkbox]").forEach(function(cb) { cb.checked = true; }); fetchFigure(); };
+  var clr = document.createElement("button");
+  clr.textContent = "Clear";
+  clr.onclick = function() { sb.querySelectorAll("input[type=checkbox]").forEach(function(cb) { cb.checked = false; }); fetchFigure(); };
+  btns.append(selAll, clr);
+  sb.appendChild(btns);
 
-    for (const col of cols) {
-      const lbl = document.createElement("label");
-      const cb = document.createElement("input");
-      cb.type = "checkbox"; cb.value = col; cb.name = "col";
+  // Flat list of all columns (no categories)
+  for (var group in groups) {
+    var cols = groups[group];
+    for (var i = 0; i < cols.length; i++) {
+      var lbl = document.createElement("label");
+      var cb = document.createElement("input");
+      cb.type = "checkbox"; cb.value = cols[i]; cb.name = "col";
       cb.addEventListener("change", fetchFigure);
-      lbl.append(cb, " " + col);
-      details.appendChild(lbl);
+      lbl.append(cb, " " + cols[i]);
+      sb.appendChild(lbl);
     }
-    sb.appendChild(details);
   }
 }
 
