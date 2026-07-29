@@ -168,12 +168,8 @@
     .sidebar-resize { position: absolute; top: 0; right: -4px; width: 8px; height: 100%;
                       cursor: col-resize; z-index: 10; }
     .sidebar-resize:hover, .sidebar-resize.active { background: var(--accent); opacity: 0.3; border-radius: 2px; }
-    .toggle-sidebar { align-self: flex-start; background: var(--bg-tertiary);
-                      border: 1px solid var(--border); border-radius: 4px; width: 22px; height: 22px;
-                      display: flex; align-items: center; justify-content: center;
-                      cursor: pointer; font-size: 0.65rem; color: var(--text-muted); transition: all 0.15s;
-                      z-index: 2; padding: 0; margin-bottom: 6px; }
-    .toggle-sidebar:hover { color: var(--accent); border-color: var(--accent); }
+    .sidebar.collapsed { width: auto; min-width: 0; padding: 4px; overflow: hidden; }
+    .sidebar.collapsed .sidebar-resize { display: none; }
     .sidebar details { margin-bottom: 4px; }
     .sidebar summary { cursor: pointer; font-weight: 600; padding: 6px 4px; font-size: 0.82rem;
                        color: var(--text-secondary); border-radius: 3px; }
@@ -305,7 +301,6 @@
   </div><!-- end .top-bar -->
 
   <div class="main hidden" id="main-area">
-    <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     <div class="sidebar" id="sidebar">
       <div class="sidebar-resize" id="sidebar-resize"></div>
     </div>
@@ -824,16 +819,6 @@ document.getElementById("btn-ingest").onclick = async function() {
 };
 
 // ── Sidebar ─────────────────────────────────────────────────────────
-document.getElementById("btn-toggle-sidebar").onclick = function() {
-  var sb = document.getElementById("sidebar");
-  if (sb.style.display === "none") {
-    sb.style.display = "";
-    this.textContent = "◀";
-  } else {
-    sb.style.display = "none";
-    this.textContent = "▶";
-  }
-};
 
 // Sidebar drag-to-resize
 (function() {
@@ -876,16 +861,34 @@ function buildSidebar(groups) {
   sb.innerHTML = "";
   sb.appendChild(resizeHandle);
 
-  // Single select all / clear buttons
+  // Button row with toggle + All + Clear
   var btns = document.createElement("div");
   btns.className = "group-btns";
+  var toggleBtn = document.createElement("button");
+  toggleBtn.id = "btn-toggle-sidebar";
+  toggleBtn.textContent = "◀";
+  toggleBtn.title = "Hide sidebar";
+  toggleBtn.onclick = function() {
+    var content = sb.querySelectorAll(".sidebar-content");
+    if (sb.classList.contains("collapsed")) {
+      sb.classList.remove("collapsed");
+      toggleBtn.textContent = "◀";
+      for (var i = 0; i < content.length; i++) content[i].style.display = "";
+    } else {
+      sb.classList.add("collapsed");
+      toggleBtn.textContent = "▶";
+      for (var i = 0; i < content.length; i++) content[i].style.display = "none";
+    }
+  };
   var selAll = document.createElement("button");
+  selAll.className = "sidebar-content";
   selAll.textContent = "All";
   selAll.onclick = function() { sb.querySelectorAll("input[type=checkbox]").forEach(function(cb) { cb.checked = true; }); fetchFigure(); };
   var clr = document.createElement("button");
+  clr.className = "sidebar-content";
   clr.textContent = "Clear";
   clr.onclick = function() { sb.querySelectorAll("input[type=checkbox]").forEach(function(cb) { cb.checked = false; }); fetchFigure(); };
-  btns.append(selAll, clr);
+  btns.append(toggleBtn, selAll, clr);
   sb.appendChild(btns);
 
   // Flat list of all columns (no categories)
@@ -893,6 +896,7 @@ function buildSidebar(groups) {
     var cols = groups[group];
     for (var i = 0; i < cols.length; i++) {
       var lbl = document.createElement("label");
+      lbl.className = "sidebar-content";
       var cb = document.createElement("input");
       cb.type = "checkbox"; cb.value = cols[i]; cb.name = "col";
       cb.addEventListener("change", fetchFigure);
