@@ -34,17 +34,42 @@ def _load_file(path):
         raise ValueError(f"Unsupported file type: {ext}")
 
     date_col = None
+
+    # Pass 1: columns already parsed as datetime
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             date_col = col
             break
-        if "date" in col.lower() or "time" in col.lower():
-            try:
-                df[col] = pd.to_datetime(df[col])
-                date_col = col
-                break
-            except Exception:
-                continue
+
+    # Pass 2: columns with date/time-related names
+    if date_col is None:
+        date_keywords = ["date", "time", "timestamp", "datetime", "period", "day", "month", "year"]
+        for col in df.columns:
+            col_lower = col.lower().replace("_", " ").replace("-", " ")
+            if any(kw in col_lower for kw in date_keywords):
+                try:
+                    df[col] = pd.to_datetime(df[col], dayfirst=True, format="mixed")
+                    date_col = col
+                    break
+                except Exception:
+                    continue
+
+    # Pass 3: try parsing any object/string column as dates
+    if date_col is None:
+        for col in df.columns:
+            if df[col].dtype == object:
+                sample = df[col].dropna().head(20)
+                if len(sample) == 0:
+                    continue
+                try:
+                    parsed = pd.to_datetime(sample, dayfirst=True, format="mixed")
+                    if parsed.notna().sum() >= len(sample) * 0.8:
+                        df[col] = pd.to_datetime(df[col], dayfirst=True, format="mixed")
+                        date_col = col
+                        break
+                except Exception:
+                    continue
+
     if date_col is None:
         raise ValueError("No date/time column found in file")
     df = df.sort_values(date_col)
