@@ -29,8 +29,8 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-           background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; }
-    .container { max-width: 100%; margin: 0 auto; padding: 16px; }
+           background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; margin: 0; padding: 0; }
+    .container { max-width: 100%; margin: 0 auto; padding: 0; }
     .hidden { display: none !important; }
 
     /* Header */
@@ -161,11 +161,10 @@
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; }
-    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 60px); overflow-y: auto;
+    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 56px); overflow-y: auto;
               position: sticky; top: 56px; align-self: flex-start;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
-               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s;
-               position: relative; }
+               padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
     .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
     .sidebar.collapsed .col-group, .sidebar.collapsed .group-btns { display: none; }
     .toggle-sidebar { position: sticky; top: 0; display: block; background: var(--bg-tertiary);
