@@ -757,34 +757,62 @@ document.getElementById("btn-back-home").onclick = () => {
 };
 
 // Ingest button
-document.getElementById("btn-ingest").onclick = () => {
-  const selectedCols = [...document.querySelectorAll("#col-list input:checked")].map(cb => cb.value);
-  const selectedMonths = [...document.querySelectorAll("#month-list .month-items input:checked")].map(cb => cb.value);
-  const eventCols = "";
+document.getElementById("btn-ingest").onclick = async function() {
+  var selectedCols = [].slice.call(document.querySelectorAll("#col-list input:checked")).map(function(cb) { return cb.value; });
+  var selectedMonths = [].slice.call(document.querySelectorAll("#month-list .month-items input:checked")).map(function(cb) { return cb.value; });
 
   if (selectedCols.length === 0) { alert("Please select at least one column."); return; }
   if (selectedMonths.length === 0) { alert("Please select at least one date period."); return; }
+
+  var sid = state.scanData && state.scanData.sid;
+
+  // Check if server still has file cached; if not, re-upload from IndexedDB
+  if (sid) {
+    try {
+      var checkR = await fetch("/api/check-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sid: sid }),
+      });
+      var checkData = await checkR.json();
+      if (!checkData.cached) { sid = null; }
+    } catch(e) { sid = null; }
+  }
+
+  if (!sid && state.currentFile) {
+    showLoading("Re-uploading file…");
+    try {
+      var cached = await getFile(state.currentFile);
+      if (!cached) { alert("File no longer cached. Please upload again."); hideLoading(); return; }
+      var fd = new FormData();
+      fd.append("file", cached.blob, state.currentFile);
+      var uploadData = await uploadWithProgress(fd);
+      if (uploadData.error) { hideLoading(); alert(uploadData.error); return; }
+      state.scanData = uploadData;
+      sid = uploadData.sid;
+    } catch(e) { hideLoading(); alert("Re-upload failed: " + e); return; }
+  }
 
   showLoading("Loading selected data…");
   fetch("/api/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sid: state.scanData && state.scanData.sid, columns: selectedCols, months: selectedMonths, event_cols: "" }),
+    body: JSON.stringify({ sid: sid, columns: selectedCols, months: selectedMonths, event_cols: "" }),
   })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       hideLoading();
       if (data.error) { alert(data.error); return; }
       state.groups = data.groups;
 
       // Save to memory
-      saveSession(state.currentFile, { sid: state.scanData && state.scanData.sid, columns: selectedCols, months: selectedMonths, eventCols });
+      saveSession(state.currentFile, { sid: sid, columns: selectedCols, months: selectedMonths, eventCols: "" });
 
-      document.getElementById("row-count").textContent = `${data.row_count.toLocaleString()} rows`;
+      document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
       buildSidebar(data.groups);
       showView("visualiser");
     })
-    .catch(err => { hideLoading(); alert("Ingest failed: " + err); });
+    .catch(function(err) { hideLoading(); alert("Ingest failed: " + err); });
 };
 
 // ── Sidebar ─────────────────────────────────────────────────────────
