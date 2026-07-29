@@ -198,6 +198,7 @@
     .progress-bar { width: 220px; height: 6px; background: var(--border); border-radius: 3px; margin-top: 12px; overflow: hidden; }
     .progress-bar .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.15s; width: 0%; }
     .progress-pct { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+    .progress-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block; }
 
     /* Scrollbar styling */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -220,6 +221,7 @@
     <p id="loading-text">Uploading and processing file…</p>
     <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
     <span class="progress-pct" id="progress-pct"></span>
+    <span class="progress-detail" id="progress-detail"></span>
   </div>
 
   <!-- ═══ HOMEPAGE ═══ -->
@@ -397,30 +399,37 @@ function showLoading(msg) {
   document.getElementById("loading-text").textContent = msg;
   document.getElementById("progress-fill").style.width = "0%";
   document.getElementById("progress-pct").textContent = "";
+  document.getElementById("progress-detail").textContent = "";
   document.getElementById("loading").classList.add("visible");
 }
 function hideLoading() { document.getElementById("loading").classList.remove("visible"); }
-function setProgress(pct) {
+function setProgress(pct, loaded, total) {
   document.getElementById("progress-fill").style.width = pct + "%";
   document.getElementById("progress-pct").textContent = Math.round(pct) + "%";
+  if (loaded !== undefined && total !== undefined) {
+    var loadedMB = (loaded / 1048576).toFixed(2);
+    var totalMB = (total / 1048576).toFixed(2);
+    document.getElementById("progress-detail").textContent = loadedMB + " / " + totalMB + " MB";
+  }
 }
 
 function uploadWithProgress(fd) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
-    xhr.upload.onprogress = (e) => {
+    xhr.upload.onprogress = function(e) {
       if (e.lengthComputable) {
-        const pct = (e.loaded / e.total) * 70; // Upload is 0-70%
-        setProgress(pct);
+        var pct = (e.loaded / e.total) * 70;
+        setProgress(pct, e.loaded, e.total);
       }
     };
-    xhr.onload = () => {
-      setProgress(90); // Processing on server
+    xhr.onload = function() {
+      setProgress(90);
+      document.getElementById("progress-detail").textContent = "Processing on server…";
       try { resolve(JSON.parse(xhr.responseText)); }
       catch(e) { reject(new Error("Invalid response")); }
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = function() { reject(new Error("Upload failed")); };
     xhr.send(fd);
   });
 }
