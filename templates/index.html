@@ -188,15 +188,6 @@
     #chart { flex: 1; min-width: 0; min-height: 500px; overflow: auto; max-width: 100%; background: var(--bg-secondary);
              border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 85vh; }
     .placeholder { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 0.95rem; }
-    .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 5px 0;
-      position: sticky; top: 0; z-index: 10; background: var(--bg-primary); transition: opacity 0.3s; }
-    .pagination.scrolled { opacity: 0.6; }
-    .pagination:hover { opacity: 1; }
-    .pagination button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
-      padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
-    .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .pagination span { color: var(--text-secondary); font-size: 0.85rem; }
 
     /* Loading indicator */
     .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(13,17,23,0.9);
@@ -293,6 +284,14 @@
     <label style="font-size:.75rem;color:var(--text-muted);margin-left:4px;display:flex;align-items:center;gap:4px;">
       Y− <input type="number" id="y-axis-cap-neg" style="width:60px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
     </label>
+    <span id="page-controls" style="display:none;margin-left:10px;font-size:.75rem;display:flex;align-items:center;gap:6px;">
+      <button id="page-prev" style="padding:2px 8px;font-size:.7rem;">←</button>
+      <span id="page-info" style="color:var(--text-muted);">1/1</span>
+      <button id="page-next" style="padding:2px 8px;font-size:.7rem;">→</button>
+      <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+        Per pg <input type="number" id="page-size" value="10" min="1" max="100" style="width:42px;padding:2px 4px;font-size:.7rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);">
+      </label>
+    </span>
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
     <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
     <button id="btn-home" style="margin-left:8px;font-size:.75rem;padding:4px 10px;">🏠 Home</button>
@@ -303,14 +302,6 @@
       <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     </div>
     <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
-      <div id="pagination" class="pagination hidden">
-        <button id="page-prev">← Prev</button>
-        <span id="page-info">Page 1 of 1</span>
-        <button id="page-next">Next →</button>
-        <label style="font-size:.75rem;color:var(--text-muted);margin-left:12px;display:flex;align-items:center;gap:4px;">
-          Per page <input type="number" id="page-size" value="10" min="1" max="100" style="width:50px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);">
-        </label>
-      </div>
       <div id="chart">
         <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
       </div>
@@ -900,14 +891,14 @@ function fetchFigure() {
       var pag = fig._pagination || { page: 1, n_pages: 1, total_groups: 0 };
       delete fig._pagination;
       state.page = pag.page;
-      var pagDiv = document.getElementById("pagination");
+      var pagCtrl = document.getElementById("page-controls");
       if (pag.n_pages > 1) {
-        pagDiv.classList.remove("hidden");
-        document.getElementById("page-info").textContent = "Page " + pag.page + " of " + pag.n_pages + " (" + pag.total_groups + " plots)";
+        pagCtrl.style.display = "flex";
+        document.getElementById("page-info").textContent = pag.page + "/" + pag.n_pages;
         document.getElementById("page-prev").disabled = pag.page <= 1;
         document.getElementById("page-next").disabled = pag.page >= pag.n_pages;
       } else {
-        pagDiv.classList.add("hidden");
+        pagCtrl.style.display = "none";
       }
 
       var layout = Object.assign({}, fig.layout, {
@@ -929,7 +920,7 @@ function fetchFigure() {
           if (layout[key].title) layout[key].title.font = { color: '#8b949e', size: 12 };
         }
       }
-      if (layout.title) layout.title.font = { color: '#e6edf3', size: 14 };
+      delete layout.title;
 
       // Apply Y axis caps if set
       var yCapPos = parseFloat(document.getElementById("y-axis-cap").value);
@@ -976,13 +967,6 @@ function fetchFigure() {
 document.getElementById("page-prev").onclick = function() { state.page = Math.max(1, state.page - 1); fetchFigure(); };
 document.getElementById("page-next").onclick = function() { state.page++; fetchFigure(); };
 document.getElementById("page-size").addEventListener("change", function() { state.page = 1; fetchFigure(); });
-
-// Make pagination transparent on scroll
-document.getElementById("chart").addEventListener("scroll", function() {
-  var pag = document.getElementById("pagination");
-  if (this.scrollTop > 10) { pag.classList.add("scrolled"); }
-  else { pag.classList.remove("scrolled"); }
-});
 
 // ── Init ────────────────────────────────────────────────────────────
 renderHomepage();

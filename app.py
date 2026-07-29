@@ -206,11 +206,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
     fig.update_layout(
         height=total_height,
-        margin=dict(l=55, r=40, t=80, b=90), autosize=True,
-        title=dict(
-            text=f"{period} – {'Normalised within each graph' if normalised else 'Raw'}",
-            font=dict(size=15),
-        ),
+        margin=dict(l=55, r=40, t=30, b=90), autosize=True,
         font=dict(size=11),
         grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.22),
     )
