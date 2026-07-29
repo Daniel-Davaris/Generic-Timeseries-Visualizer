@@ -192,7 +192,7 @@ def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
 
 
 def build_figure(df, date_col, raw_series, event_cols, series_colors,
-                 period, normalised, selected_cols, page=1, page_size=10):
+                 period, normalised, selected_cols, page=1, page_size=10, plot_height=200):
     fig = go.Figure()
     groups = _get_groups(df, date_col, period)
     total_groups = len(groups)
@@ -201,7 +201,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
     start = (page - 1) * page_size
     page_groups = groups[start:start + page_size]
     n_groups = max(1, len(page_groups))
-    total_height = _get_total_height(n_groups)
+    total_height = max(400, plot_height * n_groups)
     dtick, tickformat = _get_tick_settings(period)
 
     fig.update_layout(
@@ -410,10 +410,11 @@ def figure():
     selected_cols = data.get("selected_cols", [])
     page = int(data.get("page", 1))
     page_size = int(data.get("page_size", 10))
+    plot_height = int(data.get("plot_height", 200))
 
     fig, total_groups, n_pages, current_page = build_figure(
         ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
-        ds["colors"], period, normalised, selected_cols, page, page_size,
+        ds["colors"], period, normalised, selected_cols, page, page_size, plot_height,
     )
     # Serialize figure and add pagination metadata
     fig_json = json.loads(plotly.io.to_json(fig))

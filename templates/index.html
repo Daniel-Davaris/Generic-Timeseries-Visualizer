@@ -287,6 +287,9 @@
     <label style="font-size:.75rem;color:var(--text-muted);margin-left:4px;display:flex;align-items:center;gap:4px;">
       Y− <input type="number" id="y-axis-cap-neg" style="width:60px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
     </label>
+    <label style="font-size:.75rem;color:var(--text-muted);margin-left:4px;display:flex;align-items:center;gap:4px;">
+      Plot H <input type="number" id="plot-height" value="200" min="50" max="2000" style="width:50px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);">
+    </label>
     <span id="page-controls" style="display:none;margin-left:10px;font-size:.75rem;display:flex;align-items:center;gap:6px;">
       <button id="page-prev" style="padding:2px 8px;font-size:.7rem;">←</button>
       <span id="page-info" style="color:var(--text-muted);">1/1</span>
@@ -885,6 +888,7 @@ document.getElementById("btn-yearly").onclick = () => { setPeriod("Yearly"); fet
 
 document.getElementById("y-axis-cap").addEventListener("change", fetchFigure);
 document.getElementById("y-axis-cap-neg").addEventListener("change", fetchFigure);
+document.getElementById("plot-height").addEventListener("change", fetchFigure);
 
 
 
@@ -910,7 +914,7 @@ function fetchFigure() {
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10 }),
+    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10, plot_height: parseInt(document.getElementById("plot-height").value) || 200 }),
   })
     .then(function(r) { return r.json(); })
     .then(function(fig) {
