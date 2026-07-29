@@ -34,7 +34,7 @@
     .hidden { display: none !important; }
 
     /* Header */
-    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px;
+    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 0;
                   padding: 2px 0; border-bottom: 1px solid var(--border); height: 24px;
                   position: sticky; top: 0; z-index: 100; background: var(--bg-primary); }
     .app-header .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; text-transform: uppercase;
@@ -151,7 +151,7 @@
     /* Toolbar */
     .toolbar { display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; align-items: center;
                padding: 2px 8px; background: var(--bg-secondary); border: 1px solid var(--border);
-               border-radius: 4px; height: 24px; position: sticky; top: 28px; z-index: 99; }
+               border-radius: 0; height: 24px; position: sticky; top: 25px; z-index: 99; }
     .toolbar button { padding: 3px 10px; border: 1px solid var(--border); border-radius: 4px;
                       background: var(--bg-tertiary); cursor: pointer; font-size: 0.75rem;
                       color: var(--text-secondary); transition: all 0.15s; }
@@ -161,8 +161,8 @@
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; }
-    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 56px); overflow-y: auto;
-              position: sticky; top: 56px; align-self: flex-start;
+    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 52px); overflow-y: auto;
+              position: sticky; top: 52px; align-self: flex-start;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
                padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
     .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }

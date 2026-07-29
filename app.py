@@ -185,7 +185,7 @@ def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
             ys.extend([y_min, y_max, None])
     fig.add_trace(go.Scattergl(
         x=xs, y=ys, mode="lines", name=col,
-        line=dict(color=color, width=3), opacity=0.35,
+        line=dict(color=color, width=1.5), opacity=0.35,
         xaxis=f"x{axis_suffix}", yaxis=f"y{axis_suffix}",
         legendgroup=col, showlegend=(row_idx == 1),
     ))
@@ -251,7 +251,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
                 y_plot = _normalise(y) if normalised else y
                 fig.add_trace(go.Scattergl(
                     x=df_part[date_col], y=y_plot, mode="lines", name=col,
-                    line=dict(color=series_colors.get(col, "#636EFA")),
+                    line=dict(color=series_colors.get(col, "#636EFA"), width=1),
                     xaxis=f"x{axis_suffix}", yaxis=f"y{axis_suffix}",
                     legendgroup=col, showlegend=(row_idx == 1),
                 ))
