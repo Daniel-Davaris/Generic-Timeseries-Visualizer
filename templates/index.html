@@ -302,13 +302,15 @@
     <div class="sidebar" id="sidebar">
       <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     </div>
-    <div id="pagination" class="pagination hidden">
-      <button id="page-prev">← Prev</button>
-      <span id="page-info">Page 1 of 1</span>
-      <button id="page-next">Next →</button>
-    </div>
-    <div id="chart">
-      <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
+    <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
+      <div id="pagination" class="pagination hidden">
+        <button id="page-prev">← Prev</button>
+        <span id="page-info">Page 1 of 1</span>
+        <button id="page-next">Next →</button>
+      </div>
+      <div id="chart">
+        <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
+      </div>
     </div>
   </div>
 </div>
