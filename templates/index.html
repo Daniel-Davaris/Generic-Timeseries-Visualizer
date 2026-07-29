@@ -307,6 +307,9 @@
         <button id="page-prev">← Prev</button>
         <span id="page-info">Page 1 of 1</span>
         <button id="page-next">Next →</button>
+        <label style="font-size:.75rem;color:var(--text-muted);margin-left:12px;display:flex;align-items:center;gap:4px;">
+          Per page <input type="number" id="page-size" value="10" min="1" max="100" style="width:50px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);">
+        </label>
       </div>
       <div id="chart">
         <div class="placeholder">Select columns from the sidebar and click <strong>⚡ Apply selection</strong></div>
@@ -886,7 +889,7 @@ function fetchFigure() {
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page }),
+    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10 }),
   })
     .then(function(r) { return r.json(); })
     .then(function(fig) {
@@ -972,6 +975,7 @@ function fetchFigure() {
 
 document.getElementById("page-prev").onclick = function() { state.page = Math.max(1, state.page - 1); fetchFigure(); };
 document.getElementById("page-next").onclick = function() { state.page++; fetchFigure(); };
+document.getElementById("page-size").addEventListener("change", function() { state.page = 1; fetchFigure(); });
 
 // Make pagination transparent on scroll
 document.getElementById("chart").addEventListener("scroll", function() {
