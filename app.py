@@ -213,13 +213,14 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
                     font=dict(size=10)),
     )
 
+    annotations = []
+
     for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
         y_min, y_max = _y_range(df_part, selected_cols, raw_series, event_cols, normalised)
 
         xaxis_settings = dict(
             anchor=f"y{axis_suffix}",
-            title=dict(text=title, font=dict(size=11), standoff=4),
             tickfont=dict(size=10), tickangle=0, automargin=True,
             range=[period_start, period_end], tickformat=tickformat,
         )
@@ -232,6 +233,14 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
             anchor=f"x{axis_suffix}", tickfont=dict(size=10),
             automargin=True, range=[y_min, y_max],
         )
+
+        # Add title annotation at top-left of each subplot
+        annotations.append(dict(
+            text=f"<b>{title}</b>",
+            xref=f"x{axis_suffix} domain", yref=f"y{axis_suffix} domain",
+            x=0, y=1, xanchor="left", yanchor="bottom",
+            font=dict(size=11), showarrow=False,
+        ))
 
         for col in selected_cols:
             if col in event_cols:
@@ -247,6 +256,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
                     legendgroup=col, showlegend=(row_idx == 1),
                 ))
 
+    fig.update_layout(annotations=annotations)
     return fig, total_groups, n_pages, page
 
 
