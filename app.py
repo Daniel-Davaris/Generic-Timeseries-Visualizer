@@ -206,7 +206,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
     fig.update_layout(
         height=total_height,
-        margin=dict(l=40, r=10, t=0, b=20), autosize=True,
+        margin=dict(l=30, r=5, t=0, b=20), autosize=True,
         font=dict(size=11),
         grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.06),
         legend=dict(orientation="h", x=0, y=1, xanchor="left", yanchor="top",
