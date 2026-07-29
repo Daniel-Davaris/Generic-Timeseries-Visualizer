@@ -168,11 +168,9 @@
     .sidebar-resize { position: absolute; top: 0; right: -4px; width: 8px; height: 100%;
                       cursor: col-resize; z-index: 10; }
     .sidebar-resize:hover, .sidebar-resize.active { background: var(--accent); opacity: 0.3; border-radius: 2px; }
-    .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
-    .sidebar.collapsed .col-group, .sidebar.collapsed .group-btns { display: none; }
-    .toggle-sidebar { position: sticky; top: 0; display: block; background: var(--bg-tertiary);
+    .toggle-sidebar { align-self: flex-start; background: var(--bg-tertiary);
                       border: 1px solid var(--border); border-radius: 4px; width: 22px; height: 22px;
-                      display: flex; align-items: center; justify-content: center; margin-left: auto;
+                      display: flex; align-items: center; justify-content: center;
                       cursor: pointer; font-size: 0.65rem; color: var(--text-muted); transition: all 0.15s;
                       z-index: 2; padding: 0; margin-bottom: 6px; }
     .toggle-sidebar:hover { color: var(--accent); border-color: var(--accent); }
@@ -307,9 +305,9 @@
   </div><!-- end .top-bar -->
 
   <div class="main hidden" id="main-area">
+    <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     <div class="sidebar" id="sidebar">
       <div class="sidebar-resize" id="sidebar-resize"></div>
-      <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     </div>
     <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
       <div id="chart">
@@ -827,9 +825,14 @@ document.getElementById("btn-ingest").onclick = async function() {
 
 // ── Sidebar ─────────────────────────────────────────────────────────
 document.getElementById("btn-toggle-sidebar").onclick = function() {
-  const sb = document.getElementById("sidebar");
-  sb.classList.toggle("collapsed");
-  this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
+  var sb = document.getElementById("sidebar");
+  if (sb.style.display === "none") {
+    sb.style.display = "";
+    this.textContent = "◀";
+  } else {
+    sb.style.display = "none";
+    this.textContent = "▶";
+  }
 };
 
 // Sidebar drag-to-resize
@@ -869,11 +872,9 @@ chartResizeObserver.observe(document.getElementById("chart"));
 
 function buildSidebar(groups) {
   var sb = document.getElementById("sidebar");
-  var toggleBtn = document.getElementById("btn-toggle-sidebar");
   var resizeHandle = document.getElementById("sidebar-resize");
   sb.innerHTML = "";
   sb.appendChild(resizeHandle);
-  sb.appendChild(toggleBtn);
 
   // Single select all / clear buttons
   var btns = document.createElement("div");
