@@ -161,10 +161,13 @@
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; }
-    .sidebar { width: 150px; min-width: 0; max-height: calc(100vh - 54px); overflow-y: auto;
+    .sidebar { width: 150px; min-width: 80px; max-height: calc(100vh - 54px); overflow-y: auto;
               position: sticky; top: 54px; align-self: flex-start;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
-               padding: 4px 6px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
+               padding: 4px 6px; flex-shrink: 0; }
+    .sidebar-resize { position: absolute; top: 0; right: -4px; width: 8px; height: 100%;
+                      cursor: col-resize; z-index: 10; }
+    .sidebar-resize:hover, .sidebar-resize.active { background: var(--accent); opacity: 0.3; border-radius: 2px; }
     .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
     .sidebar.collapsed .col-group, .sidebar.collapsed .group-btns { display: none; }
     .toggle-sidebar { position: sticky; top: 0; display: block; background: var(--bg-tertiary);
@@ -305,6 +308,7 @@
 
   <div class="main hidden" id="main-area">
     <div class="sidebar" id="sidebar">
+      <div class="sidebar-resize" id="sidebar-resize"></div>
       <button class="toggle-sidebar" id="btn-toggle-sidebar" title="Toggle sidebar">◀</button>
     </div>
     <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
@@ -828,6 +832,32 @@ document.getElementById("btn-toggle-sidebar").onclick = function() {
   this.textContent = sb.classList.contains("collapsed") ? "▶" : "◀";
 };
 
+// Sidebar drag-to-resize
+(function() {
+  var handle = document.getElementById("sidebar-resize");
+  var sidebar = document.getElementById("sidebar");
+  var startX, startWidth;
+  handle.addEventListener("mousedown", function(e) {
+    e.preventDefault();
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    handle.classList.add("active");
+    document.addEventListener("mousemove", onDrag);
+    document.addEventListener("mouseup", onUp);
+  });
+  function onDrag(e) {
+    var newWidth = startWidth + (e.clientX - startX);
+    if (newWidth < 80) newWidth = 80;
+    if (newWidth > 600) newWidth = 600;
+    sidebar.style.width = newWidth + "px";
+  }
+  function onUp() {
+    handle.classList.remove("active");
+    document.removeEventListener("mousemove", onDrag);
+    document.removeEventListener("mouseup", onUp);
+  }
+})();
+
 // Use ResizeObserver for smooth width-only resize (preserve explicit height)
 const chartResizeObserver = new ResizeObserver(() => {
   const chartDiv = document.getElementById("chart");
@@ -840,7 +870,9 @@ chartResizeObserver.observe(document.getElementById("chart"));
 function buildSidebar(groups) {
   var sb = document.getElementById("sidebar");
   var toggleBtn = document.getElementById("btn-toggle-sidebar");
+  var resizeHandle = document.getElementById("sidebar-resize");
   sb.innerHTML = "";
+  sb.appendChild(resizeHandle);
   sb.appendChild(toggleBtn);
 
   // Single select all / clear buttons
