@@ -188,7 +188,10 @@
     #chart { flex: 1; min-width: 0; min-height: 500px; overflow: auto; max-width: 100%; background: var(--bg-secondary);
              border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 85vh; }
     .placeholder { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 0.95rem; }
-    .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0; }
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 5px 0;
+      position: sticky; top: 0; z-index: 10; background: var(--bg-primary); transition: opacity 0.3s; }
+    .pagination.scrolled { opacity: 0.6; }
+    .pagination:hover { opacity: 1; }
     .pagination button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
       padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
     .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -972,6 +975,13 @@ function fetchFigure() {
 
 document.getElementById("page-prev").onclick = function() { state.page = Math.max(1, state.page - 1); fetchFigure(); };
 document.getElementById("page-next").onclick = function() { state.page++; fetchFigure(); };
+
+// Make pagination transparent on scroll
+document.getElementById("chart").addEventListener("scroll", function() {
+  var pag = document.getElementById("pagination");
+  if (this.scrollTop > 10) { pag.classList.add("scrolled"); }
+  else { pag.classList.remove("scrolled"); }
+});
 
 // ── Init ────────────────────────────────────────────────────────────
 renderHomepage();
