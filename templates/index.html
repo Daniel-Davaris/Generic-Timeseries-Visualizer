@@ -954,49 +954,45 @@ function getSelectedCols() {
 function fetchFigure() {
   var cols = getSelectedCols();
   showLoading("Generating chart…");
-
-  // Check server cache first
-  fetch("/api/check-cache", { method: "POST", credentials: "same-origin" })
-    .then(function(r) { return r.json(); })
-    .then(function(cacheResult) {
-      if (cacheResult.cached) {
-        return doFetchFigure(cols);
-      }
-      // Re-upload from IndexedDB
+  doFetchFigure(cols).then(function(ok) {
+    if (ok === false) {
+      // Server lost cache, re-upload
       showLoading("Re-uploading file…");
-      return getFile(state.currentFile).then(function(blob) {
+      getFile(state.currentFile).then(function(blob) {
         if (!blob) { hideLoading(); alert("File no longer cached. Please upload again."); return; }
         var fd = new FormData();
         fd.append("file", blob, state.currentFile);
-        return uploadWithProgress(fd).then(function(uploadData) {
+        uploadWithProgress(fd).then(function(uploadData) {
           if (uploadData.error) { hideLoading(); alert(uploadData.error); return; }
           state.scanData = uploadData;
-          // Re-ingest with current selections
           var entry = getMemory().find(function(e) { return e.filename === state.currentFile; });
           var ingestBody = { selected_columns: entry ? entry.columns : [], selected_months: entry ? entry.months : [] };
-          return fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ingestBody) })
+          fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ingestBody) })
             .then(function(r) { return r.json(); })
             .then(function(ingestData) {
               if (ingestData.error) { hideLoading(); alert(ingestData.error); return; }
               state.groups = ingestData.groups;
-              return doFetchFigure(cols);
+              doFetchFigure(cols);
             });
         });
       });
-    })
-    .catch(function(err) { hideLoading(); alert("Error: " + err); });
+    }
+  });
 }
 
 function doFetchFigure(cols) {
-  fetch("/api/figure", {
+  return fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10, plot_height: parseInt(document.getElementById("plot-height").value) || 200 }),
   })
     .then(function(r) { return r.json(); })
     .then(function(fig) {
+      if (fig.error) {
+        if (fig.error === "No dataset loaded") { return false; }
+        hideLoading(); alert(fig.error); return;
+      }
       hideLoading();
-      if (fig.error) { alert(fig.error); return; }
 
       // Handle pagination metadata
       var pag = fig._pagination || { page: 1, n_pages: 1, total_groups: 0 };
