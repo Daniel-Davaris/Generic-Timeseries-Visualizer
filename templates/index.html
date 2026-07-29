@@ -956,7 +956,7 @@ function fetchFigure() {
   showLoading("Generating chart…");
 
   // Check server cache first
-  fetch("/api/check-cache", { method: "GET", credentials: "same-origin" })
+  fetch("/api/check-cache", { method: "POST", credentials: "same-origin" })
     .then(function(r) { return r.json(); })
     .then(function(cacheResult) {
       if (cacheResult.cached) {
