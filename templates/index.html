@@ -34,9 +34,10 @@
     .hidden { display: none !important; }
 
     /* Header */
-    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 0;
-                  padding: 2px 0; border-bottom: none; height: 24px;
-                  position: sticky; top: 0; z-index: 100; background: var(--bg-secondary); }
+    .top-bar { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary);
+               border-bottom: 1px solid var(--border); }
+    .app-header { display: flex; align-items: center; gap: 12px;
+                  padding: 2px 8px; height: 24px; }
     .app-header .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; text-transform: uppercase;
                             letter-spacing: 1px; }
 
@@ -149,9 +150,8 @@
     .file-card .fc-actions .fc-del:hover { border-color: #f85149; color: #f85149; }
 
     /* Toolbar */
-    .toolbar { display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; align-items: center;
-               padding: 0 8px; background: var(--bg-secondary); border: 1px solid var(--border);
-               border-radius: 0; height: 28px; position: sticky; top: 25px; z-index: 99; box-sizing: border-box; }
+    .toolbar { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center;
+               padding: 0 8px; height: 28px; box-sizing: border-box; }
     .toolbar button { padding: 2px 8px; border: 1px solid var(--border); border-radius: 3px;
                       background: var(--bg-tertiary); cursor: pointer; font-size: 0.7rem;
                       color: var(--text-secondary); transition: all 0.15s; line-height: 1.2; }
@@ -161,8 +161,8 @@
 
     /* Main layout */
     .main { display: flex; gap: 10px; align-items: flex-start; }
-    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 52px); overflow-y: auto;
-              position: sticky; top: 52px; align-self: flex-start;
+    .sidebar { width: 300px; min-width: 0; max-height: calc(100vh - 54px); overflow-y: auto;
+              position: sticky; top: 54px; align-self: flex-start;
                background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
                padding: 10px; flex-shrink: 0; transition: width 0.2s, padding 0.2s; }
     .sidebar.collapsed { width: 28px; padding: 10px 2px; overflow: hidden; }
@@ -211,6 +211,7 @@
 </head>
 <body>
 <div class="container">
+  <div class="top-bar">
   <div class="app-header">
     <button id="btn-home" style="font-size:.75rem;padding:4px 10px;">🏠 Home</button>
     <span class="subtitle">Timeseries Intelligence</span>
@@ -300,6 +301,7 @@
     <span id="row-count" style="margin-left:12px;font-size:.8rem;color:var(--text-muted);font-weight:600"></span>
     <button id="btn-edit-selection" style="margin-left:auto;font-size:.75rem;padding:4px 10px;">⚙ Edit selection</button>
   </div>
+  </div><!-- end .top-bar -->
 
   <div class="main hidden" id="main-area">
     <div class="sidebar" id="sidebar">
