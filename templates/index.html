@@ -286,7 +286,7 @@
     <button id="btn-weekly">Weekly</button>
     <button id="btn-monthly">Monthly</button>
     <button id="btn-yearly" class="active">Yearly</button>
-    <button id="btn-normalise">Show normalised</button>
+    
     <label style="font-size:.75rem;color:var(--text-muted);margin-left:10px;display:flex;align-items:center;gap:4px;">
       Y+ <input type="number" id="y-axis-cap" style="width:60px;padding:3px 6px;font-size:.75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);" placeholder="None">
     </label>
@@ -857,12 +857,7 @@ document.getElementById("btn-weekly").onclick = () => { setPeriod("Weekly"); fet
 document.getElementById("btn-monthly").onclick = () => { setPeriod("Monthly"); fetchFigure(); };
 document.getElementById("btn-yearly").onclick = () => { setPeriod("Yearly"); fetchFigure(); };
 
-document.getElementById("btn-normalise").onclick = function () {
-  state.normalised = !state.normalised;
-  this.textContent = state.normalised ? "Show raw" : "Show normalised";
-  this.classList.toggle("active", state.normalised);
-  fetchFigure();
-};
+
 
 document.getElementById("y-axis-cap").addEventListener("change", fetchFigure);
 document.getElementById("y-axis-cap-neg").addEventListener("change", fetchFigure);
@@ -891,7 +886,7 @@ function fetchFigure() {
   fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: state.normalised, selected_cols: cols, page: state.page }),
+    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page }),
   })
     .then(function(r) { return r.json(); })
     .then(function(fig) {
