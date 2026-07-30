@@ -932,7 +932,8 @@ The following directories are verified active as of 2026-07-30:
 | `Trading_Cumulative_Price` | Prices / Market Cap | 5-min |
 | `Trading_IRSR` | Interconnectors / Settlement | 30-min |
 | `TradingIS_Reports` | Trading (full MMS) | 5-min |
-| `VicGas` | Gas | Gas market |
+| `DWGM` | Gas (Declared Wholesale Gas Market — VIC) | Gas market |
+| `VicGas` | Gas (Victorian gas market data) | Gas market |
 | `Vwa_Fcas_Prices` | FCAS Prices | Daily |
 | `WDR_CAPACITY_NO_SCADA` | Demand Response | 5-min |
 | `Weekly_Bulletin` | Market Notices | Weekly |
