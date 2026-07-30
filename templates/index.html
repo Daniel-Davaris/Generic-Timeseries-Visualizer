@@ -38,6 +38,9 @@
                border-bottom: 1px solid var(--border); }
     .app-header { display: flex; align-items: center; gap: 12px;
                   padding: 2px 8px; height: 24px; }
+    .app-header .logo-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex;
+                            align-items: center; border-radius: 6px; transition: transform 0.15s; }
+    .app-header .logo-btn:hover { transform: scale(1.1); }
     .app-header .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; text-transform: uppercase;
                             letter-spacing: 1px; }
 
@@ -219,7 +222,13 @@
 <div class="container">
   <div class="top-bar">
   <div class="app-header">
-    <button id="btn-home" style="font-size:.75rem;padding:4px 10px;">🏠 Home</button>
+    <button id="btn-home" class="logo-btn" title="Home">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="5" fill="#58a6ff"/>
+        <polyline points="4,16 8,10 12,14 16,7 20,12" stroke="#0d1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="16" cy="7" r="2" fill="#0d1117"/>
+      </svg>
+    </button>
     <span class="subtitle">Timeseries Intelligence</span>
   </div>
 
