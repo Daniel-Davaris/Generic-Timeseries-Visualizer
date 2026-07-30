@@ -131,6 +131,14 @@
                               cursor: pointer; padding: 2px 6px; border-radius: 3px; }
     .recent-item .ri-delete:hover { background: rgba(248,81,73,0.15); color: #f85149; }
 
+    /* Landing page menu */
+    .menu-card { padding: 24px 20px; background: var(--bg-secondary); border: 1px solid var(--border);
+                 border-radius: 8px; cursor: pointer; transition: all 0.15s; text-align: center; }
+    .menu-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .menu-icon { font-size: 2rem; margin-bottom: 10px; }
+    .menu-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+    .menu-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
+
     /* Homepage */
     .homepage-files { margin-bottom: 20px; }
     .homepage-files h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary);
@@ -224,8 +232,23 @@
     <span class="progress-detail" id="progress-detail"></span>
   </div>
 
-  <!-- ═══ HOMEPAGE ═══ -->
-  <div id="homepage">
+  <!-- ═══ LANDING PAGE ═══ -->
+  <div id="landing">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px;">
+      <h1 style="font-size:1.6rem;font-weight:700;color:var(--text-primary);margin:0;">Timeseries Intelligence</h1>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin:0;">Select a tool to get started</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;width:100%;max-width:600px;margin-top:20px;">
+        <div class="menu-card" id="menu-timeseries">
+          <div class="menu-icon">📈</div>
+          <div class="menu-title">Timeseries Visualizer</div>
+          <div class="menu-desc">Upload and visualize time-based data with interactive charts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TIMESERIES HOME (file list + upload) ═══ -->
+  <div id="homepage" class="hidden">
     <div class="homepage-files" id="homepage-files"></div>
     <div class="wizard-step" id="step-upload">
       <h2><span class="step-num">📄</span> Upload new file</h2>
@@ -389,6 +412,7 @@ function timeAgo(isoStr) {
 
 // ── Navigation helpers ──────────────────────────────────────────────
 function showView(view) {
+  document.getElementById("landing").classList.toggle("hidden", view !== "landing");
   document.getElementById("homepage").classList.toggle("hidden", view !== "home");
   document.getElementById("wizard").classList.toggle("hidden", view !== "wizard");
   document.getElementById("toolbar").classList.toggle("hidden", view !== "visualiser");
@@ -944,7 +968,7 @@ document.getElementById("btn-edit-selection").onclick = () => {
 };
 
 // Home button
-document.getElementById("btn-home").onclick = () => { showView("home"); renderHomepage(); };
+document.getElementById("btn-home").onclick = function() { showView("landing"); };
 
 // ── Fetch figure ────────────────────────────────────────────────────
 function getSelectedCols() {
@@ -1075,9 +1099,11 @@ document.getElementById("page-prev").onclick = function() { state.page = Math.ma
 document.getElementById("page-next").onclick = function() { state.page++; fetchFigure(); };
 document.getElementById("page-size").addEventListener("change", function() { state.page = 1; fetchFigure(); });
 
+// Menu card click
+document.getElementById("menu-timeseries").onclick = function() { showView("home"); renderHomepage(); };
+
 // ── Init ────────────────────────────────────────────────────────────
-renderHomepage();
-showView("home");
+showView("landing");
 </script>
 </body>
 </html>
