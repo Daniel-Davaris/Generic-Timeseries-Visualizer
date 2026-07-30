@@ -451,6 +451,15 @@ def db_explorer():
 def info_page():
     return render_template("info.html")
 
+@app.route("/api/catalogue")
+def serve_catalogue():
+    """Serve the AEMO data catalogue markdown with explicit UTF-8 encoding."""
+    import os
+    md_path = os.path.join(app.static_folder, "aemo_data_catalogue.md")
+    with open(md_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
 @app.route("/api/db/tables", methods=["GET"])
 def db_tables():
     """List all tables with row counts and column info."""

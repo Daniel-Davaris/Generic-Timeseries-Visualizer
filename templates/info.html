@@ -73,7 +73,7 @@
   </div>
 
 <script>
-fetch("/static/aemo_data_catalogue.md")
+fetch("/api/catalogue")
   .then(function(r) { return r.text(); })
   .then(function(md) {
     document.getElementById("content").innerHTML = marked.parse(md);
