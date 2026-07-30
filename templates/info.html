@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEMO NEM Data Catalogue – Timeseries Intelligence</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230d1117'/><polyline points='4,24 10,14 16,18 22,8 28,16' stroke='%2358a6ff' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root { --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-tertiary: #21262d;
+            --text-primary: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+            --border: #30363d; --accent: #58a6ff; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: var(--bg-primary); color: var(--text-primary); font-size: 14px;
+           line-height: 1.6; }
+
+    .top-bar { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary);
+               border-bottom: 1px solid var(--border); padding: 8px 16px;
+               display: flex; align-items: center; gap: 12px; }
+    .top-bar .logo-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex; }
+    .top-bar .logo-btn:hover { transform: scale(1.1); }
+    .top-bar h1 { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+    .top-bar .subtitle { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+
+    /* Markdown styling */
+    .content h1 { font-size: 1.6rem; margin: 32px 0 16px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .content h2 { font-size: 1.2rem; margin: 28px 0 12px; color: var(--accent); }
+    .content h3 { font-size: 1rem; margin: 20px 0 8px; color: var(--text-primary); }
+    .content p { margin: 8px 0; color: var(--text-secondary); }
+    .content blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 12px 0;
+                          background: var(--bg-secondary); border-radius: 0 4px 4px 0; color: var(--text-muted); font-size: 0.85rem; }
+    .content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.82rem; }
+    .content th { text-align: left; padding: 8px 10px; background: var(--bg-tertiary); color: var(--text-secondary);
+                  font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .content td { padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    .content td:first-child { font-family: 'Fira Code', monospace; font-size: 0.78rem; color: var(--accent); white-space: nowrap; }
+    .content tr:hover td { background: var(--bg-secondary); }
+    .content code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px; font-size: 0.85em; color: var(--accent); }
+    .content pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;
+                   padding: 16px; overflow-x: auto; margin: 12px 0; }
+    .content pre code { background: none; padding: 0; color: var(--text-primary); }
+    .content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+    .content ul, .content ol { padding-left: 24px; margin: 8px 0; color: var(--text-secondary); }
+    .content li { margin: 4px 0; }
+    .content a { color: var(--accent); text-decoration: none; }
+    .content a:hover { text-decoration: underline; }
+    .content details { margin: 12px 0; }
+    .content summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 8px; }
+    .content summary:hover { background: var(--bg-secondary); border-radius: 4px; }
+    .content strong { color: var(--text-primary); }
+
+    .loading { text-align: center; padding: 60px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <a href="/" class="logo-btn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="5" fill="#58a6ff"/>
+        <polyline points="4,16 8,10 12,14 16,7 20,12" stroke="#0d1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="16" cy="7" r="2" fill="#0d1117"/>
+      </svg>
+    </a>
+    <h1>AEMO NEM Data Catalogue</h1>
+    <span class="subtitle">Complete reference of all available datasets</span>
+  </div>
+
+  <div class="content" id="content">
+    <div class="loading">Loading catalogue…</div>
+  </div>
+
+<script>
+fetch("/static/aemo_data_catalogue.md")
+  .then(function(r) { return r.text(); })
+  .then(function(md) {
+    document.getElementById("content").innerHTML = marked.parse(md);
+  })
+  .catch(function(err) {
+    document.getElementById("content").innerHTML = '<p style="color:red;">Failed to load: ' + err + '</p>';
+  });
+</script>
+</body>
+</html>

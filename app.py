@@ -447,6 +447,10 @@ def db_explorer():
     return render_template("db_explorer.html")
 
 
+@app.route("/info")
+def info_page():
+    return render_template("info.html")
+
 @app.route("/api/db/tables", methods=["GET"])
 def db_tables():
     """List all tables with row counts and column info."""
