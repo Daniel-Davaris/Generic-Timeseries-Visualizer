@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Explorer – Timeseries Intelligence</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230d1117'/><polyline points='4,24 10,14 16,18 22,8 28,16' stroke='%2358a6ff' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg>">
+  <style>
+    :root { --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-tertiary: #21262d;
+            --text-primary: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+            --border: #30363d; --accent: #58a6ff; --accent-green: #3fb950; --accent-red: #f85149; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
+
+    .top-bar { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary);
+               border-bottom: 1px solid var(--border); padding: 8px 16px;
+               display: flex; align-items: center; gap: 12px; }
+    .top-bar .logo-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex; }
+    .top-bar .logo-btn:hover { transform: scale(1.1); }
+    .top-bar h1 { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+    .top-bar .subtitle { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
+
+    .layout { display: flex; height: calc(100vh - 45px); }
+    .sidebar { width: 240px; border-right: 1px solid var(--border); overflow-y: auto;
+               background: var(--bg-secondary); padding: 8px; flex-shrink: 0; }
+    .sidebar h3 { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);
+                  letter-spacing: 0.5px; margin-bottom: 6px; padding: 4px; }
+    .table-item { padding: 6px 8px; border-radius: 4px; cursor: pointer; display: flex;
+                  justify-content: space-between; align-items: center; font-size: 0.8rem;
+                  color: var(--text-secondary); transition: all 0.1s; }
+    .table-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .table-item.active { background: var(--bg-tertiary); color: var(--accent); border-left: 2px solid var(--accent); }
+    .table-item .row-count { font-size: 0.65rem; color: var(--text-muted); background: var(--bg-primary);
+                             padding: 1px 5px; border-radius: 8px; }
+
+    .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
+    .tab { padding: 8px 16px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer;
+           border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab:hover { color: var(--text-primary); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-content { flex: 1; overflow: auto; padding: 12px; display: none; }
+    .tab-content.active { display: block; }
+
+    /* Schema tab */
+    .schema-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .schema-table th { text-align: left; padding: 6px 10px; background: var(--bg-tertiary);
+                       color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
+    .schema-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    .schema-table .type { color: var(--accent); font-family: monospace; font-size: 0.75rem; }
+
+    /* Data table */
+    .data-wrap { overflow: auto; max-height: calc(100vh - 180px); }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; white-space: nowrap; }
+    .data-table th { position: sticky; top: 0; padding: 5px 8px; background: var(--bg-tertiary);
+                     color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border);
+                     text-align: left; }
+    .data-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    .data-table tr:hover td { background: var(--bg-tertiary); }
+
+    /* SQL Editor */
+    .sql-editor { display: flex; flex-direction: column; height: 100%; }
+    .sql-input { width: 100%; min-height: 120px; padding: 12px; font-family: 'Fira Code', monospace;
+                 font-size: 0.85rem; background: var(--bg-primary); color: var(--text-primary);
+                 border: 1px solid var(--border); border-radius: 6px; resize: vertical; outline: none; }
+    .sql-input:focus { border-color: var(--accent); }
+    .sql-actions { display: flex; gap: 8px; margin: 8px 0; align-items: center; }
+    .btn { padding: 6px 14px; font-size: 0.8rem; border-radius: 4px; cursor: pointer;
+           border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary);
+           transition: all 0.15s; }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-run { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .btn-run:hover { background: #79c0ff; }
+    .sql-status { font-size: 0.75rem; color: var(--text-muted); }
+    .sql-error { color: var(--accent-red); font-size: 0.8rem; padding: 8px; background: #1a0000;
+                 border: 1px solid var(--accent-red); border-radius: 4px; margin-top: 8px; }
+    .sql-results { flex: 1; overflow: auto; margin-top: 8px; }
+
+    /* Export button */
+    .export-btn { position: absolute; top: 8px; right: 8px; }
+
+    .empty-state { display: flex; align-items: center; justify-content: center; height: 100%;
+                   color: var(--text-muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <a href="/" class="logo-btn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="5" fill="#58a6ff"/>
+        <polyline points="4,16 8,10 12,14 16,7 20,12" stroke="#0d1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="16" cy="7" r="2" fill="#0d1117"/>
+      </svg>
+    </a>
+    <h1>Database Explorer</h1>
+    <span class="subtitle">PostgreSQL · timeseries_db</span>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar" id="sidebar">
+      <h3>Tables</h3>
+      <div id="table-list"><span style="color:var(--text-muted);font-size:.8rem;">Loading…</span></div>
+    </div>
+
+    <div class="main-panel">
+      <div class="tabs">
+        <div class="tab active" data-tab="schema">Schema</div>
+        <div class="tab" data-tab="data">Data</div>
+        <div class="tab" data-tab="sql">SQL Query</div>
+      </div>
+
+      <div class="tab-content active" id="tab-schema">
+        <div class="empty-state" id="schema-empty">Select a table from the sidebar</div>
+        <table class="schema-table" id="schema-table" style="display:none;"></table>
+      </div>
+
+      <div class="tab-content" id="tab-data">
+        <div class="empty-state" id="data-empty">Select a table from the sidebar</div>
+        <div class="data-wrap" id="data-wrap" style="display:none;">
+          <table class="data-table" id="data-table"></table>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-sql">
+        <div class="sql-editor">
+          <textarea class="sql-input" id="sql-input" placeholder="SELECT * FROM your_table LIMIT 100;"></textarea>
+          <div class="sql-actions">
+            <button class="btn btn-run" id="btn-run-sql">▶ Run Query</button>
+            <span class="sql-status" id="sql-status"></span>
+          </div>
+          <div id="sql-error"></div>
+          <div class="sql-results">
+            <div class="data-wrap">
+              <table class="data-table" id="sql-results-table"></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+var currentTable = null;
+
+// Tabs
+document.querySelectorAll(".tab").forEach(function(tab) {
+  tab.addEventListener("click", function() {
+    document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
+    document.querySelectorAll(".tab-content").forEach(function(c) { c.classList.remove("active"); });
+    tab.classList.add("active");
+    document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+// Load tables
+function loadTables() {
+  fetch("/api/db/tables")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var list = document.getElementById("table-list");
+      if (!data.tables || data.tables.length === 0) {
+        list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem;padding:8px;">No tables found</span>';
+        return;
+      }
+      var html = "";
+      data.tables.forEach(function(t) {
+        html += '<div class="table-item" data-table="' + t.name + '">' +
+                '<span>' + t.name + '</span>' +
+                '<span class="row-count">' + (t.row_count || 0).toLocaleString() + ' rows</span></div>';
+      });
+      list.innerHTML = html;
+      list.querySelectorAll(".table-item").forEach(function(item) {
+        item.addEventListener("click", function() {
+          list.querySelectorAll(".table-item").forEach(function(i) { i.classList.remove("active"); });
+          item.classList.add("active");
+          selectTable(item.dataset.table);
+        });
+      });
+    });
+}
+
+function selectTable(name) {
+  currentTable = name;
+  loadSchema(name);
+  loadData(name);
+}
+
+function loadSchema(name) {
+  document.getElementById("schema-empty").style.display = "none";
+  var table = document.getElementById("schema-table");
+  table.style.display = "table";
+  table.innerHTML = '<tr><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th></tr>';
+
+  fetch("/api/db/schema/" + encodeURIComponent(name))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var html = '<tr><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th></tr>';
+      data.columns.forEach(function(col) {
+        html += '<tr><td>' + col.name + '</td><td class="type">' + col.type + '</td>' +
+                '<td>' + (col.nullable ? 'YES' : 'NO') + '</td>' +
+                '<td>' + (col.default || '—') + '</td></tr>';
+      });
+      table.innerHTML = html;
+    });
+}
+
+function loadData(name) {
+  document.getElementById("data-empty").style.display = "none";
+  var wrap = document.getElementById("data-wrap");
+  wrap.style.display = "block";
+  var table = document.getElementById("data-table");
+  table.innerHTML = '<tr><td>Loading…</td></tr>';
+
+  fetch("/api/db/preview/" + encodeURIComponent(name) + "?limit=100")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { table.innerHTML = '<tr><td>' + data.error + '</td></tr>'; return; }
+      var html = '<thead><tr>';
+      data.columns.forEach(function(col) { html += '<th>' + col + '</th>'; });
+      html += '</tr></thead><tbody>';
+      data.rows.forEach(function(row) {
+        html += '<tr>';
+        row.forEach(function(val) { html += '<td>' + (val !== null ? val : '<span style="color:var(--text-muted)">NULL</span>') + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+      table.innerHTML = html;
+    });
+}
+
+// SQL Query
+document.getElementById("btn-run-sql").addEventListener("click", runQuery);
+document.getElementById("sql-input").addEventListener("keydown", function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { runQuery(); }
+});
+
+function runQuery() {
+  var sql = document.getElementById("sql-input").value.trim();
+  if (!sql) return;
+  var status = document.getElementById("sql-status");
+  var errDiv = document.getElementById("sql-error");
+  var table = document.getElementById("sql-results-table");
+  status.textContent = "Running…";
+  errDiv.innerHTML = "";
+  table.innerHTML = "";
+
+  var start = Date.now();
+  fetch("/api/db/query", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sql: sql })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var elapsed = ((Date.now() - start) / 1000).toFixed(2);
+      if (data.error) {
+        status.textContent = "";
+        errDiv.innerHTML = '<div class="sql-error">' + data.error + '</div>';
+        return;
+      }
+      status.textContent = data.row_count + " rows · " + elapsed + "s";
+      if (!data.columns || data.columns.length === 0) { return; }
+      var html = '<thead><tr>';
+      data.columns.forEach(function(col) { html += '<th>' + col + '</th>'; });
+      html += '</tr></thead><tbody>';
+      data.rows.forEach(function(row) {
+        html += '<tr>';
+        row.forEach(function(val) { html += '<td>' + (val !== null ? val : '<span style="color:var(--text-muted)">NULL</span>') + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+      table.innerHTML = html;
+    })
+    .catch(function(err) {
+      status.textContent = "";
+      errDiv.innerHTML = '<div class="sql-error">' + err + '</div>';
+    });
+}
+
+// Init
+loadTables();
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 import os
 import json
+import csv
+import io
 
 import pandas as pd
 import plotly
@@ -9,6 +11,8 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://tsapp:ts1ntel2024!@localhost:5432/timeseries_db")
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -426,6 +430,145 @@ def figure():
         "page_size": page_size,
     }
     return Response(json.dumps(fig_json), mimetype="application/json")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# DATABASE EXPLORER API
+# ══════════════════════════════════════════════════════════════════════
+
+def _get_db_conn():
+    """Get a database connection."""
+    import psycopg2
+    return psycopg2.connect(DATABASE_URL)
+
+
+@app.route("/db")
+def db_explorer():
+    return render_template("db_explorer.html")
+
+
+@app.route("/api/db/tables", methods=["GET"])
+def db_tables():
+    """List all tables with row counts and column info."""
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT t.table_name,
+                   pg_stat_user_tables.n_live_tup as row_count
+            FROM information_schema.tables t
+            LEFT JOIN pg_stat_user_tables ON pg_stat_user_tables.relname = t.table_name
+            WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+            ORDER BY t.table_name;
+        """)
+        tables = []
+        for row in cur.fetchall():
+            tables.append({"name": row[0], "row_count": row[1] or 0})
+        return jsonify(tables=tables)
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/schema/<table_name>", methods=["GET"])
+def db_schema(table_name):
+    """Get column info for a table."""
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position;
+        """, (table_name,))
+        columns = []
+        for row in cur.fetchall():
+            columns.append({
+                "name": row[0], "type": row[1],
+                "nullable": row[2] == "YES", "default": row[3]
+            })
+        return jsonify(table=table_name, columns=columns)
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/preview/<table_name>", methods=["GET"])
+def db_preview(table_name):
+    """Preview first N rows of a table."""
+    limit = min(int(request.args.get("limit", 100)), 1000)
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        # Validate table name to prevent SQL injection
+        cur.execute("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify(error="Table not found"), 404
+        cur.execute(f'SELECT * FROM "{table_name}" LIMIT %s;', (limit,))
+        cols = [desc[0] for desc in cur.description]
+        rows = []
+        for row in cur.fetchall():
+            rows.append([str(v) if v is not None else None for v in row])
+        return jsonify(columns=cols, rows=rows, total_shown=len(rows))
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/query", methods=["POST"])
+def db_query():
+    """Execute a read-only SQL query."""
+    data = request.get_json(force=True)
+    sql = data.get("sql", "").strip()
+    if not sql:
+        return jsonify(error="No SQL provided"), 400
+
+    # Block dangerous statements
+    sql_upper = sql.upper().lstrip()
+    allowed_starts = ("SELECT", "WITH", "EXPLAIN")
+    if not any(sql_upper.startswith(s) for s in allowed_starts):
+        return jsonify(error="Only SELECT/WITH/EXPLAIN queries are allowed"), 403
+
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(sql)
+        cols = [desc[0] for desc in cur.description] if cur.description else []
+        rows = []
+        if cols:
+            for row in cur.fetchmany(5000):
+                rows.append([str(v) if v is not None else None for v in row])
+        return jsonify(columns=cols, rows=rows, row_count=len(rows))
+    except Exception as e:
+        conn.rollback()
+        return jsonify(error=str(e)), 400
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/export/<table_name>", methods=["GET"])
+def db_export(table_name):
+    """Export a table as CSV."""
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify(error="Table not found"), 404
+        cur.execute(f'SELECT * FROM "{table_name}";')
+        cols = [desc[0] for desc in cur.description]
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(cols)
+        for row in cur:
+            writer.writerow(row)
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={table_name}.csv"}
+        )
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
