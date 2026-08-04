@@ -418,6 +418,8 @@ function saveSession(filename, config) {
     months: config.months,
     eventCols: config.eventCols || "",
     view: config.view || (prev && prev.view) || null,
+    groups: config.groups || (prev && prev.groups) || null,
+    rowCount: config.rowCount || (prev && prev.rowCount) || null,
     savedAt: new Date().toISOString(),
   });
   saveMemory(filtered);
@@ -876,7 +878,8 @@ document.getElementById("btn-ingest").onclick = async function() {
         if (data.error) { alert(data.error); return; }
         state.groups = data.groups;
         state.dbSelection = { columns: selectedCols, months: selectedMonths };
-        saveSession(state.currentFile, { columns: selectedCols, months: selectedMonths });
+        saveSession(state.currentFile, { columns: selectedCols, months: selectedMonths,
+                                         groups: data.groups, rowCount: data.row_count });
         document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
         buildSidebar(data.groups);
         showView("visualiser");
@@ -1088,6 +1091,9 @@ function fetchFigure() {
           .then(function(ingestData) {
             if (ingestData.error) { hideLoading(); alert(ingestData.error); return; }
             state.groups = ingestData.groups;
+            saveSession(state.currentFile, { columns: state.dbSelection.columns, months: state.dbSelection.months,
+                                             groups: ingestData.groups, rowCount: ingestData.row_count });
+            document.getElementById("row-count").textContent = ingestData.row_count.toLocaleString() + " rows";
             doFetchFigure(cols);
           });
         return;
@@ -1255,9 +1261,24 @@ document.getElementById("page-size").addEventListener("change", function() { sta
     return;
   }
 
-  // Returning visit: ingest saved selection and restore the view
-  showLoading("Restoring saved view…");
+  // Returning visit: rebuild UI from the locally cached structure and render
+  // immediately — the figure request re-ingests only if the server lost the data.
   state.dbSelection = { columns: entry.columns, months: entry.months };
+  if (entry.groups) {
+    state.groups = entry.groups;
+    if (entry.rowCount) document.getElementById("row-count").textContent = entry.rowCount.toLocaleString() + " rows";
+    buildSidebar(entry.groups);
+    applyViewSettings(entry.view);
+    if (getSelectedCols().length === 0) {
+      document.querySelectorAll('#sidebar input[type=checkbox]').forEach(function(cb) { cb.checked = true; });
+    }
+    showView("visualiser");
+    fetchFigure();
+    return;
+  }
+
+  // Older saved entry without cached structure: one-time ingest
+  showLoading("Restoring saved view…");
   fetch("/api/db/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1267,6 +1288,8 @@ document.getElementById("page-size").addEventListener("change", function() { sta
     .then(function(data) {
       if (data.error) { hideLoading(); openWizard(); return; }
       state.groups = data.groups;
+      saveSession(state.currentFile, { columns: entry.columns, months: entry.months,
+                                       groups: data.groups, rowCount: data.row_count });
       document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
       buildSidebar(data.groups);
       applyViewSettings(entry.view);
