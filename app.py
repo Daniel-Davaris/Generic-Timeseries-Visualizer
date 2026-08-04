@@ -221,6 +221,9 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
     )
 
     annotations = []
+    # Reserve a left gutter for the group titles; plots start where the title ends.
+    max_label = max((len(t) for t, _, _, _ in page_groups), default=4)
+    title_frac = min(0.15, 0.010 * max_label + 0.010)
 
     for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
@@ -230,6 +233,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
             anchor=f"y{axis_suffix}",
             tickfont=dict(size=10), tickangle=0, automargin=True,
             range=[period_start, period_end], tickformat=tickformat,
+            domain=[title_frac, 1.0],
         )
         if dtick is not None:
             xaxis_settings["dtick"] = dtick
@@ -241,11 +245,11 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
             automargin=True, range=[y_min, y_max],
         )
 
-        # Add title annotation at top-left of each subplot
+        # Title annotation in the left gutter, vertically centered on its subplot
         annotations.append(dict(
             text=f"<b>{title}</b>",
-            xref=f"x{axis_suffix} domain", yref=f"y{axis_suffix} domain",
-            x=0, y=1, xanchor="left", yanchor="bottom",
+            xref="paper", yref=f"y{axis_suffix} domain",
+            x=0, y=0.5, xanchor="left", yanchor="middle",
             font=dict(size=11), showarrow=False,
         ))
 
