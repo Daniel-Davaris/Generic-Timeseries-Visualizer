@@ -113,31 +113,38 @@ def _normalise(y):
     return (y - y.min()) / denom if denom != 0 else y * 0
 
 
-def _get_groups(df, date_col, period):
+def _get_page_groups(df, date_col, period, page, page_size):
+    """Group rows by period and materialize ONLY the requested page of groups."""
+    d = df[date_col]
     if period == "Weekly":
-        year_start = pd.to_datetime(df[date_col].dt.year.astype(str) + "-01-01")
-        week_num = ((df[date_col] - year_start).dt.days // 7) + 1
-        df = df.copy()
-        df["_group"] = df[date_col].dt.year.astype(str) + "-W" + week_num.astype(str).str.zfill(2)
-        df["_start"] = year_start + pd.to_timedelta((week_num - 1) * 7, unit="D")
-        df["_end"] = df["_start"] + pd.Timedelta(days=7) - pd.Timedelta(seconds=1)
+        year_start = pd.to_datetime(d.dt.year.astype(str) + "-01-01")
+        week_num = ((d - year_start).dt.days // 7) + 1
+        labels = d.dt.year.astype(str) + "-W" + week_num.astype(str).str.zfill(2)
+        starts = year_start + pd.to_timedelta((week_num - 1) * 7, unit="D")
+        ends = starts + pd.Timedelta(days=7) - pd.Timedelta(seconds=1)
     elif period == "Monthly":
-        df = df.copy()
-        month_period = df[date_col].dt.to_period("M")
-        df["_group"] = month_period.astype(str)
-        df["_start"] = month_period.dt.start_time
-        df["_end"] = month_period.dt.end_time
+        month_period = d.dt.to_period("M")
+        labels = month_period.astype(str)
+        starts = month_period.dt.start_time
+        ends = month_period.dt.end_time
     else:
-        df = df.copy()
-        df["_group"] = df[date_col].dt.year.astype(str)
-        df["_start"] = pd.to_datetime(df[date_col].dt.year.astype(str) + "-01-01")
-        df["_end"] = pd.to_datetime(df[date_col].dt.year.astype(str) + "-12-31 23:59:59")
+        labels = d.dt.year.astype(str)
+        starts = pd.to_datetime(labels + "-01-01")
+        ends = pd.to_datetime(labels + "-12-31 23:59:59")
 
-    groups = sorted(df["_group"].dropna().unique())
-    return [
-        (str(g), df[df["_group"] == g], df[df["_group"] == g]["_start"].iloc[0], df[df["_group"] == g]["_end"].iloc[0])
-        for g in groups
-    ]
+    # Integer codes per row; uniques come back sorted. No sub-frame is built here.
+    codes, uniques = pd.factorize(labels, sort=True)
+    total_groups = len(uniques)
+    n_pages = max(1, -(-total_groups // page_size))  # ceil division
+    page = max(1, min(page, n_pages))
+    start = (page - 1) * page_size
+
+    page_groups = []
+    for gi in range(start, min(start + page_size, total_groups)):
+        mask = codes == gi
+        page_groups.append((str(uniques[gi]), df.loc[mask],
+                            starts.loc[mask].iloc[0], ends.loc[mask].iloc[0]))
+    return page_groups, total_groups, n_pages, page
 
 
 def _get_total_height(n):
@@ -198,12 +205,7 @@ def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
 def build_figure(df, date_col, raw_series, event_cols, series_colors,
                  period, normalised, selected_cols, page=1, page_size=10, plot_height=200):
     fig = go.Figure()
-    groups = _get_groups(df, date_col, period)
-    total_groups = len(groups)
-    n_pages = max(1, -(-total_groups // page_size))  # ceil division
-    page = max(1, min(page, n_pages))
-    start = (page - 1) * page_size
-    page_groups = groups[start:start + page_size]
+    page_groups, total_groups, n_pages, page = _get_page_groups(df, date_col, period, page, page_size)
     n_groups = max(1, len(page_groups))
     total_height = max(400, plot_height * n_groups)
     dtick, tickformat = _get_tick_settings(period)
