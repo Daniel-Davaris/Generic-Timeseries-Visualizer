@@ -158,31 +158,41 @@ def _period_index(ds, period):
         return cache[period]
 
     d = ds["df"][ds["date_col"]]
+    years = d.dt.year.to_numpy()
     if period == "Weekly":
-        year_start = pd.to_datetime(d.dt.year.astype(str) + "-01-01")
-        week_num = ((d - year_start).dt.days // 7) + 1
-        labels = d.dt.year.astype(str) + "-W" + week_num.astype(str).str.zfill(2)
-        starts = year_start + pd.to_timedelta((week_num - 1) * 7, unit="D")
-        ends = starts + pd.Timedelta(days=7) - pd.Timedelta(seconds=1)
+        week = (d.dt.dayofyear.to_numpy() - 1) // 7 + 1
+        keys = years * 100 + week
     elif period == "Monthly":
-        month_period = d.dt.to_period("M")
-        labels = month_period.astype(str)
-        starts = month_period.dt.start_time
-        ends = month_period.dt.end_time
+        keys = years * 12 + (d.dt.month.to_numpy() - 1)
     else:
-        labels = d.dt.year.astype(str)
-        starts = pd.to_datetime(labels + "-01-01")
-        ends = pd.to_datetime(labels + "-12-31 23:59:59")
+        keys = years
 
-    codes, uniques = pd.factorize(labels, sort=True)
+    codes, uniques = pd.factorize(keys, sort=True)
     # Date-sorted rows + chronologically sortable labels => codes non-decreasing,
     # so group i occupies positions [bounds[i], bounds[i+1]).
     bounds = np.searchsorted(codes, np.arange(len(uniques) + 1))
-    firsts = bounds[:-1]
-    starts_np = starts.to_numpy()[firsts]
-    ends_np = ends.to_numpy()[firsts]
-    entry = ([str(u) for u in uniques], bounds,
-             [pd.Timestamp(t) for t in starts_np], [pd.Timestamp(t) for t in ends_np])
+
+    titles, g_starts, g_ends = [], [], []
+    for k in uniques:
+        k = int(k)
+        if period == "Weekly":
+            y, w = k // 100, k % 100
+            titles.append(f"{y}-W{w:02d}")
+            start = pd.Timestamp(y, 1, 1) + pd.Timedelta(days=(w - 1) * 7)
+            end = start + pd.Timedelta(days=7) - pd.Timedelta(seconds=1)
+        elif period == "Monthly":
+            y, m = k // 12, k % 12 + 1
+            p = pd.Period(year=y, month=m, freq="M")
+            titles.append(str(p))
+            start, end = p.start_time, p.end_time
+        else:
+            titles.append(str(k))
+            start = pd.Timestamp(k, 1, 1)
+            end = pd.Timestamp(k, 12, 31, 23, 59, 59)
+        g_starts.append(start)
+        g_ends.append(end)
+
+    entry = (titles, bounds, g_starts, g_ends)
     cache[period] = entry
     return entry
 
