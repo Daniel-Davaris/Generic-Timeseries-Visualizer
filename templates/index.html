@@ -1222,7 +1222,7 @@ function doFetchFigure(cols) {
         }
         if (key.startsWith("yaxis")) {
           layout[key] = Object.assign({}, layout[key], { gridcolor: '#30363d',
-                                                          zerolinecolor: '#e74c3c', zerolinewidth: 1.5,
+                                                          zerolinecolor: '#30363d', zerolinewidth: 1,
                                                           zeroline: true,
                                                           tickfont: { color: '#8b949e', size: 10 } });
           if (layout[key].title) layout[key].title.font = { color: '#8b949e', size: 12 };
@@ -1257,7 +1257,7 @@ function doFetchFigure(cols) {
           shapes.push({
             type: "line", xref: "x" + idx + " domain", yref: key.replace("axis", ""),
             x0: 0, x1: 1, y0: 0, y1: 0,
-            line: { color: "#ff0000", width: 0.8, dash: "dashdot" },
+            line: { color: "rgba(248,81,73,0.25)", width: 0.6, dash: "dashdot" },
           });
         }
       }
