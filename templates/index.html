@@ -895,7 +895,9 @@ document.getElementById("btn-ingest").onclick = async function() {
                                          groups: data.groups, colors: data.colors, rowCount: data.row_count });
         document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
         buildSidebar(data.groups);
+        selectSidebarCols(selectedCols);
         showView("visualiser");
+        fetchFigure();
       })
       .catch(function(err) { hideLoading(); alert("Ingest failed: " + err); });
     return;
@@ -934,7 +936,7 @@ document.getElementById("btn-ingest").onclick = async function() {
   fetch("/api/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sid: sid, columns: selectedCols, months: selectedMonths, event_cols: "" }),
+    body: JSON.stringify({ sid: sid, columns: selectedCols, months: selectedMonths, event_cols: "", dataset_key: state.currentFile }),
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -949,7 +951,9 @@ document.getElementById("btn-ingest").onclick = async function() {
 
       document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
       buildSidebar(data.groups);
+      selectSidebarCols(selectedCols);
       showView("visualiser");
+      fetchFigure();
     })
     .catch(function(err) { hideLoading(); alert("Ingest failed: " + err); });
 };
@@ -1047,6 +1051,15 @@ function buildSidebar(groups) {
   }
 }
 
+// Check the given columns in the sidebar (used after a wizard load)
+function selectSidebarCols(cols) {
+  if (!cols || !cols.length) return;
+  var set = new Set(cols);
+  document.querySelectorAll('#sidebar input[type=checkbox]').forEach(function(cb) {
+    cb.checked = set.has(cb.value);
+  });
+}
+
 // ── Toolbar ─────────────────────────────────────────────────────────
 function setPeriod(p) {
   state.period = p;
@@ -1140,7 +1153,7 @@ function fetchFigure() {
           if (uploadData.error) { hideLoading(); alert(uploadData.error); return; }
           state.scanData = uploadData;
           var entry = getMemory().find(function(e) { return e.filename === state.currentFile; });
-          var ingestBody = { selected_columns: entry ? entry.columns : [], selected_months: entry ? entry.months : [] };
+          var ingestBody = { selected_columns: entry ? entry.columns : [], selected_months: entry ? entry.months : [], dataset_key: state.currentFile };
           fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ingestBody) })
             .then(function(r) { return r.json(); })
             .then(function(ingestData) {
@@ -1158,7 +1171,7 @@ function doFetchFigure(cols) {
   return fetch("/api/figure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10, plot_height: parseInt(document.getElementById("plot-height").value) || 200, sort_desc: state.sortDesc }),
+    body: JSON.stringify({ period: state.period, normalised: false, selected_cols: cols, page: state.page, page_size: parseInt(document.getElementById("page-size").value) || 10, plot_height: parseInt(document.getElementById("plot-height").value) || 200, sort_desc: state.sortDesc, dataset_key: state.currentFile }),
   })
     .then(function(r) { return r.json(); })
     .then(function(fig) {

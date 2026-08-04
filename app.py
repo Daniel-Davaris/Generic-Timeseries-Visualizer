@@ -362,7 +362,7 @@ def _get_dataset(sid):
     return _datasets.get(sid)
 
 
-def _set_dataset(sid, df, date_col, event_cols):
+def _set_dataset(sid, df, date_col, event_cols, key=None):
     df = df.sort_values(date_col).reset_index(drop=True)
     raw_series = _prepare_series(df, date_col, event_cols)
     colors = {col: PLOTLY_COLORS[i % len(PLOTLY_COLORS)] for i, col in enumerate(raw_series)}
@@ -374,7 +374,7 @@ def _set_dataset(sid, df, date_col, event_cols):
     _datasets[sid] = {
         "df": df, "date_col": date_col, "event_cols": event_cols,
         "raw_series": raw_series, "colors": colors, "groups": groups,
-        "x_np": x_np, "y_np": y_np, "_period_cache": {},
+        "x_np": x_np, "y_np": y_np, "_period_cache": {}, "key": key,
     }
 
 
@@ -473,7 +473,7 @@ def ingest():
     keep_cols = [date_col] + [c for c in selected_cols if c in df.columns]
     df = df[keep_cols].reset_index(drop=True)
 
-    _set_dataset(sid, df, date_col, event_cols)
+    _set_dataset(sid, df, date_col, event_cols, key=data.get("dataset_key"))
 
     ds = _get_dataset(sid)
     return jsonify(groups=ds["groups"], colors=ds["colors"], row_count=len(df), col_count=len(df.columns))
@@ -500,10 +500,13 @@ def check_cache():
 def figure():
     sid = session.get("dataset_id")
     ds = _get_dataset(sid) if sid else None
-    if not ds:
+    data = request.get_json(force=True)
+    # If the client expects a specific dataset (table/file) but the server holds
+    # a different one (or none), report it as missing so the client re-ingests.
+    expect_key = data.get("dataset_key")
+    if not ds or (expect_key and ds.get("key") and ds.get("key") != expect_key):
         return jsonify(error="No dataset loaded"), 400
 
-    data = request.get_json(force=True)
     period = data.get("period", "Yearly")
     normalised = bool(data.get("normalised", False))
     selected_cols = data.get("selected_cols", [])
@@ -979,7 +982,7 @@ def db_ingest():
 
         sid = "db_" + os.urandom(6).hex()
         session["dataset_id"] = sid
-        _set_dataset(sid, df, date_col, event_cols)
+        _set_dataset(sid, df, date_col, event_cols, key="db:" + table)
 
         ds = _get_dataset(sid)
         return jsonify(
