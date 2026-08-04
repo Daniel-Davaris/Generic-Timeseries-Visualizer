@@ -2,6 +2,12 @@
 
 > **Sources verified:** NEMWeb `/Reports/CURRENT/` directory (90+ report folders), MMSDM Historical Data Archive CTL file manifest (2026-06), MMS Electricity Data Model Report, NEMOSIS Python package documentation.
 > **Last verified:** 2026-07-30
+>
+> **Legend:**
+> - ✅ **In your database** — already loaded into this app's PostgreSQL (local table name shown)
+> - 🟢 **Live** — current data can be pulled any time from NEMWeb `Reports/CURRENT/` (minutes of latency)
+> - 🟡 **Recent** — published daily / next-day via NEMWeb
+> - ⚪ **Archive / reference** — monthly MMSDM archive or periodic publications (weeks of lag)
 
 ---
 
@@ -16,17 +22,19 @@ AEMO publishes NEM data through three main channels:
 
 ## 1. 🔄 DISPATCH — 5-Minute Real-Time (MMS)
 
+> **Availability:** 🟢 **Live** — new CSVs every 5 min via `Reports/CURRENT/DispatchIS_Reports/` and `Dispatch_SCADA/`
+
 Published every 5 minutes via `DispatchIS_Reports/` and in the MMSDM monthly archive.
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
-| `DISPATCHPRICE` | Regional reference prices (RRP) and FCAS prices for each 5-min dispatch interval, per region and intervention flag | 5-min |
-| `DISPATCHREGIONSUM` | Regional summary: cleared demand, available generation, FCAS requirements, losses, surplus reserves, AGC status | 5-min |
+| `DISPATCHPRICE` ✅ *(in your DB as `dispatch_price`)* | Regional reference prices (RRP) and FCAS prices for each 5-min dispatch interval, per region and intervention flag | 5-min |
+| `DISPATCHREGIONSUM` ✅ *(in your DB as `dispatch_region_sum`)* | Regional summary: cleared demand, available generation, FCAS requirements, losses, surplus reserves, AGC status | 5-min |
 | `DISPATCHLOAD` | Per-DUID dispatch solution: targets, enablement flags, FCAS enablement, bid details (most data-intensive table) | 5-min |
 | `DISPATCHCONSTRAINT` | Active constraint solution: marginal value, violation degree, LHS/RHS for each binding/violated constraint | 5-min |
 | `DISPATCHINTERCONNECTORRES` | Interconnector dispatch solution: MW flow, losses, reserve, marginal loss factor | 5-min |
 | `DISPATCHCASESOLUTION` | Dispatch case run metadata: solution status, OCD (over-constrained dispatch) status, solver stats | 5-min |
-| `DISPATCH_UNIT_SCADA` | Raw SCADA-measured output for each generating unit/load (MW) — published in `Dispatch_SCADA/` | 5-min |
+| `DISPATCH_UNIT_SCADA` ✅ *(in your DB as `generation_fuel (aggregated by fuel type)`)* | Raw SCADA-measured output for each generating unit/load (MW) — published in `Dispatch_SCADA/` | 5-min |
 | `DISPATCH_LOCAL_PRICE` | Local marginal price at connection point for units with local pricing difference from RRP | 5-min |
 | `DISPATCH_INTERCONNECTION` | Flow data for each interconnector including losses and marginal loss factors | 5-min |
 | `DISPATCH_MNSPBIDTRK` | Market Network Service Provider (MNSP) bid tracking per dispatch interval | 5-min |
@@ -42,6 +50,8 @@ Published every 5 minutes via `DispatchIS_Reports/` and in the MMSDM monthly arc
 ---
 
 ## 2. ⏩ P5MIN — 5-Minute Pre-Dispatch Forecast
+
+> **Availability:** 🟢 **Live** — new CSVs every 5 min via `Reports/CURRENT/P5_Reports/`
 
 Published every 5 minutes via `P5_Reports/` and `P5MINFCST/`. Covers the next ~1 hour in 5-min intervals.
 
@@ -63,15 +73,17 @@ Published every 5 minutes via `P5_Reports/` and `P5MINFCST/`. Covers the next ~1
 
 ## 3. 📅 PRE-DISPATCH (PREDISPATCH) — 30-Minute Intervals
 
+> **Availability:** 🟢 **Live** — every 30 min via `Reports/CURRENT/PredispatchIS_Reports/`
+
 Published every 30 minutes via `Predispatch_Reports/`, `PredispatchIS_Reports/`, `Predispatch_Sensitivities/`. Covers ~40 hours ahead in 30-min intervals.
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
-| `PREDISPATCHPRICE` | Pre-dispatch regional prices (RRP + FCAS prices) for all future 30-min intervals | 30-min |
-| `PREDISPATCHREGIONSUM` | Regional summary for pre-dispatch: demand forecasts, FCAS requirements, surplus, etc. | 30-min |
+| `PREDISPATCHPRICE` ✅ *(in your DB as `predispatch_price`)* | Pre-dispatch regional prices (RRP + FCAS prices) for all future 30-min intervals | 30-min |
+| `PREDISPATCHREGIONSUM` ✅ *(in your DB as `predispatch_regionsum + _part1–3`)* | Regional summary for pre-dispatch: demand forecasts, FCAS requirements, surplus, etc. | 30-min |
 | `PREDISPATCHLOAD` | Pre-dispatch per-DUID solution: targets, FCAS enablement (large table) | 30-min |
 | `PREDISPATCHCONSTRAINT` | Pre-dispatch constraint solution: marginal values for binding constraints | 30-min |
-| `PREDISPATCHINTERCONNECTORRES` | Pre-dispatch interconnector solution: flow, losses, MWF | 30-min |
+| `PREDISPATCHINTERCONNECTORRES` ✅ *(in your DB as `predispatch_interconnector (+ parts, loading now)`)* | Pre-dispatch interconnector solution: flow, losses, MWF | 30-min |
 | `PREDISPATCHCASESOLUTION` | Pre-dispatch run metadata | 30-min |
 | `PREDISPATCHPRICESENSITIVITIES` | Price sensitivities to demand changes for each pre-dispatch period | 30-min |
 | `PREDISPATCH_LOCAL_PRICE` | Local pricing in pre-dispatch | 30-min |
@@ -86,6 +98,8 @@ Published every 30 minutes via `Predispatch_Reports/`, `PredispatchIS_Reports/`,
 
 ## 4. 📆 PD7DAY — 7-Day Pre-Dispatch
 
+> **Availability:** 🟢 **Live** — every 30 min via `Reports/CURRENT/PD7Day/`
+
 Published every 30 minutes via `PD7Day/`. Covers 7 days ahead in 30-min intervals.
 
 | Table | Description | Frequency |
@@ -99,6 +113,8 @@ Published every 30 minutes via `PD7Day/`. Covers 7 days ahead in 30-min interval
 ---
 
 ## 5. 💹 TRADING — 30-Minute Settlement Intervals
+
+> **Availability:** 🟢 **Live** — every 5 min via `Reports/CURRENT/TradingIS_Reports/`
 
 Published every 5 minutes (updated at end of trading interval) via `TradingIS_Reports/` and `Next_Day_Trading/`.
 
@@ -116,9 +132,11 @@ Published every 5 minutes (updated at end of trading interval) via `TradingIS_Re
 
 ## 6. 📊 DISPATCH UNIT SCADA (Raw Metering)
 
+> **Availability:** 🟢 **Live** — every 5 min via `Reports/CURRENT/Dispatch_SCADA/`
+
 | Table / Report | Description | Frequency |
 |----------------|-------------|-----------|
-| `DISPATCH_UNIT_SCADA` | SCADA-measured actual output (MW) per DUID — the "actuals" file | 5-min |
+| `DISPATCH_UNIT_SCADA` ✅ *(in your DB as `generation_fuel (aggregated by fuel type)`)* | SCADA-measured actual output (MW) per DUID — the "actuals" file | 5-min |
 | `Dispatch_SCADA` (report dir) | Same data published via `nemweb.com.au/Reports/CURRENT/Dispatch_SCADA/` | 5-min |
 | `INTERMITTENT_GEN_SCADA` | SCADA output specifically for intermittent generators (wind/solar farms) | 5-min |
 | `Next_Day_Intermittent_Gen_Scada` | Next-day published intermittent gen SCADA | Daily (next-day) |
@@ -126,6 +144,8 @@ Published every 5 minutes (updated at end of trading interval) via `TradingIS_Re
 ---
 
 ## 7. 🌤️ INTERMITTENT GENERATION & DEMAND SENSITIVITY
+
+> **Availability:** 🟡 **Recent** — mostly next-day via `Next_Day_Intermittent_DS/`
 
 Published via `Next_Day_Intermittent_DS/` and in MMSDM archive.
 
@@ -143,6 +163,8 @@ Published via `Next_Day_Intermittent_DS/` and in MMSDM archive.
 
 ## 8. ☀️ ROOFTOP SOLAR PV
 
+> **Availability:** 🟢 **Live** — every 30 min via `Reports/CURRENT/ROOFTOP_PV/ACTUAL/` and `.../FORECAST/`
+
 Published via `ROOFTOP_PV/` directory and in MMSDM archive.
 
 | Table | Description | Frequency |
@@ -153,6 +175,8 @@ Published via `ROOFTOP_PV/` directory and in MMSDM archive.
 ---
 
 ## 9. 📋 PDPASA — Pre-Dispatch PASA
+
+> **Availability:** 🟢 **Live** — every 30 min via `Reports/CURRENT/PDPASA/`
 
 Published via `PDPASA/` and `PDPASA_DUIDAvailability/`. Reliability assessment for next ~48 hours.
 
@@ -168,6 +192,8 @@ Published via `PDPASA/` and `PDPASA_DUIDAvailability/`. Reliability assessment f
 
 ## 10. 📈 STPASA — Short-Term PASA
 
+> **Availability:** 🟢 **Live** — roughly 2-hourly via `Reports/CURRENT/Short_Term_PASA_Reports/`
+
 Published via `Short_Term_PASA_Reports/` and `STPASA_DUIDAvailability/`. Reliability assessment for next ~7 days.
 
 | Table | Description | Frequency |
@@ -181,6 +207,8 @@ Published via `Short_Term_PASA_Reports/` and `STPASA_DUIDAvailability/`. Reliabi
 ---
 
 ## 11. 📉 MTPASA — Medium-Term PASA
+
+> **Availability:** 🟡 **Recent** — weekly via `Medium_Term_PASA_Reports/`; 7-day outlook daily
 
 Published via `Medium_Term_PASA_Reports/`, `MTPASA_DUIDAvailability/`, `MTPASA_RegionAvailability/`. Reliability assessment for 2 years ahead.
 
@@ -207,13 +235,15 @@ Published via `Medium_Term_PASA_Reports/`, `MTPASA_DUIDAvailability/`, `MTPASA_R
 
 ## 12. 💰 BIDDING & OFFERS
 
+> **Availability:** 🟡 **Recent** — public next day ~04:00 AEST via `Next_Day_Offer_Energy/` / `Yesterdays_Bids_Reports/`
+
 Published in `Yesterdays_Bids_Reports/`, `Next_Day_Offer_Energy/`, `Next_Day_Offer_FCAS/` (and sparse versions). Participant bidding data (confidential on day, public next day).
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
-| `BIDDAYOFFER` | Day-ahead offer header for energy/FCAS: max availability, fixed load, enablement min/max | Daily (public next day) |
+| `BIDDAYOFFER` ✅ *(in your DB as `bid_prices`)* | Day-ahead offer header for energy/FCAS: max availability, fixed load, enablement min/max | Daily (public next day) |
 | `BIDDAYOFFER_D` | De-identified/public version of BIDDAYOFFER | Daily (next day) |
-| `BIDOFFERPERIOD` | Per-period energy/FCAS bid: 10 price-quantity bands per DUID per trading interval | Daily (public next day) |
+| `BIDOFFERPERIOD` ✅ *(in your DB as `bid_availability`)* | Per-period energy/FCAS bid: 10 price-quantity bands per DUID per trading interval | Daily (public next day) |
 | `BIDPEROFFER_D` | De-identified/public version of BIDOFFERPERIOD | Daily (next day) |
 | `BIDDUIDDETAILS` | Additional DUID-level details for bidding (e.g., PASAAVAILABILITY, MINIMUMLOAD) | Daily |
 | `BIDDUIDDETAILSTRK` | Tracking/versioning for BIDDUIDDETAILS | Daily |
@@ -231,6 +261,8 @@ Published in `Yesterdays_Bids_Reports/`, `Next_Day_Offer_Energy/`, `Next_Day_Off
 ---
 
 ## 13. ⚡ FCAS — Frequency Control Ancillary Services
+
+> **Availability:** Mixed — FCAS prices/enablement are 🟢 live inside the 5-min dispatch reports; `SET_*` settlement-recovery tables are ⚪ weekly+
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -264,6 +296,8 @@ Published in `Yesterdays_Bids_Reports/`, `Next_Day_Offer_Energy/`, `Next_Day_Off
 
 ## 14. 🔍 FREQUENCY PERFORMANCE PAYMENTS (FPP)
 
+> **Availability:** 🟢 **Live** — 5-min / 30-min via `Reports/CURRENT/FPP/`, `FPPDAILY/`, `FPPRATES/`
+
 New tables introduced for the FPP framework (from 2023+), published via `FPP/`, `FPPDAILY/`, `FPPRATES/`, `FPPRUN/`, `FPP_HIST_REG_PERF/`.
 
 | Table | Description | Frequency |
@@ -291,6 +325,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 15. 🔗 CONSTRAINTS
 
+> **Availability:** 🟢 **Live** — binding-constraint solutions arrive in the 5-min dispatch reports; definitions (`GENCON*`) update as invoked
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `GENCONDATA` | Generic constraint definitions: LHS coefficients, type, limit type, description | Updated |
@@ -309,6 +345,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 ---
 
 ## 16. 🔌 INTERCONNECTORS
+
+> **Availability:** 🟢 **Live** — flows every 5 min in dispatch reports; `SET*` residue tables are ⚪ settlement-lagged
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -330,6 +368,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 17. 🏭 GENERATION UNITS & REGISTRATION
 
+> **Availability:** 🟡 **Recent** — NEM Registration & Exemption List (Excel) weekly; MMS reference tables via monthly archive
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `DUDETAIL` | Dispatachable unit detail: registered capacity, fuel type, dispatch type, connection point | Updated |
@@ -344,7 +384,7 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 | `STADUALLOC` | Station–DUID allocation | Updated |
 | `STATIONOPERATINGSTATUS` | Current operating status of each station | Updated |
 | `EMSMASTER` | EMS (Energy Management System) master reference data | Updated |
-| `Generators and Scheduled Loads` | NEM Registration & Exemption List — full Excel register of all registered generators/loads | Weekly |
+| `Generators and Scheduled Loads` ✅ *(in your DB as `nem_duid_mapping`)* | NEM Registration & Exemption List — full Excel register of all registered generators/loads | Weekly |
 | `TRANSMISSIONLOSSFACTOR` | Transmission loss factors (TLFs/MLFs) per connection point | Annual |
 | `Marginal_Loss_Factors` (dir) | Published MLF tables | Annual |
 | `ADG_DETAIL` | Aggregate Dispatch Group detail (DUIDs within each ADG) | Updated |
@@ -353,6 +393,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 ---
 
 ## 18. 👥 PARTICIPANTS
+
+> **Availability:** ⚪ **Reference** — monthly MMSDM archive
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -364,6 +406,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 ---
 
 ## 19. 📉 DEMAND & OPERATIONAL DATA
+
+> **Availability:** 🟢 **Live** — every 30 min via `Reports/CURRENT/Operational_Demand/ACTUAL_HH/`
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -382,6 +426,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 ---
 
 ## 20. 🧾 SETTLEMENTS
+
+> **Availability:** ⚪ **Archive** — settlement runs (preliminary ~1 week, final ~4 months); monthly MMSDM
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -415,6 +461,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 21. 💵 BILLING
 
+> **Availability:** ⚪ **Archive** — weekly billing runs; monthly MMSDM
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `BILLINGCALENDAR` | Billing period calendar (settlement dates) | Quarterly |
@@ -442,6 +490,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 22. 🏛️ SETTLEMENT RESIDUE AUCTIONS (SRA / IRA)
 
+> **Availability:** ⚪ **Archive** — quarterly auctions / periodic
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `AUCTION` | SRA auction event details | Quarterly |
@@ -464,6 +514,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 23. 🌐 NETWORK / OUTAGES
 
+> **Availability:** 🟢 **Live** — outage schedules updated continuously via `Reports/CURRENT/Network/`
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `NETWORK_EQUIPMENTDETAIL` | Network equipment (transmission lines, transformers) details | Updated |
@@ -481,6 +533,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 ---
 
 ## 24. 📋 MARKET NOTICES & EVENTS
+
+> **Availability:** 🟢 **Live** — market notices published continuously via `Reports/CURRENT/Market_Notice/`
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -505,6 +559,8 @@ New tables introduced for the FPP framework (from 2023+), published via `FPP/`, 
 
 ## 25. 📰 CAUSER PAYS (FCAS 4-Second Data)
 
+> **Availability:** 🟡 **Recent** — 4-second causer-pays files published in daily batches
+
 Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Causer_Pays_Rslcpf/`.
 
 | Dataset | Description | Frequency |
@@ -518,6 +574,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 ---
 
 ## 26. 📊 PUBLIC PRICES & DEMAND FORECASTS
+
+> **Availability:** 🟢 **Live** — `Public_Prices/` daily files; demand forecasts every 30 min
 
 | Report / Table | Description | Frequency |
 |----------------|-------------|-----------|
@@ -541,6 +599,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 
 ## 27. 🌞 DEMAND RESPONSE & WDR
 
+> **Availability:** 🟡 **Recent** — daily / next-day publications
+
 | Table / Report | Description | Frequency |
 |----------------|-------------|-----------|
 | `SETCFG_WDR_REIMBURSE_RATE` | WDR reimbursement rate configuration | Updated |
@@ -550,6 +610,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 ---
 
 ## 28. 🔧 MARKET CONFIGURATION & REFERENCE
+
+> **Availability:** ⚪ **Reference** — updated as changed; monthly MMSDM archive
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -565,6 +627,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 
 ## 29. 🧩 AGGREGATE DISPATCH GROUPS (ADG)
 
+> **Availability:** ⚪ **Reference** — updated as changed
+
 | Table | Description | Frequency |
 |-------|-------------|-----------|
 | `AGGREGATE_DISPATCH_GROUP` | ADG definitions (groups of DUIDs dispatched as one) | Updated |
@@ -573,6 +637,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 ---
 
 ## 30. 📜 MARKET NOTICES (Reference)
+
+> **Availability:** 🟢 **Live** — continuous
 
 | Table | Description | Frequency |
 |-------|-------------|-----------|
@@ -583,6 +649,8 @@ Published via `Causer_Pays/`, `Causer_Pays_Elements/`, `Causer_Pays_Scada/`, `Ca
 ---
 
 ## 31. 📋 COMPLETE MMSDM TABLE MASTER LIST
+
+> **Availability:** Mixed — every table below is in the ⚪ monthly MMSDM archive; those also covered by sections 1–30 marked 🟢/🟡 can be pulled live
 
 The following is the full verified list of distinct tables present in the **MMSDM 2026-06 Historical Data Archive** (from CTL file manifest):
 
@@ -833,6 +901,8 @@ VOLTAGE_INSTRUCTION_TRK
 
 ## 32. 📁 NEMWeb `/Reports/CURRENT/` — All Report Directories
 
+> **Availability:** 🟢 **Live** — by definition: everything under `Reports/CURRENT/` is real-time or near-real-time
+
 The following directories are verified active as of 2026-07-30:
 
 | Directory | Category | Frequency |
@@ -944,6 +1014,8 @@ The following directories are verified active as of 2026-07-30:
 ---
 
 ## 33. 🐍 NEMOSIS Python Package — Supported Tables
+
+> **Availability:** Tooling note — NEMOSIS can pull both 🟢 current reports and ⚪ historical archives on demand
 
 The [NEMOSIS package](https://github.com/UNSW-CEEM/NEMOSIS) (`pip install nemosis`) wraps the following tables for programmatic access:
 
