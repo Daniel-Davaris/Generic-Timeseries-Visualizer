@@ -6,7 +6,6 @@ import io
 import pandas as pd
 import numpy as np
 import plotly
-import plotly.graph_objs as go
 from flask import Flask, render_template, request, jsonify, session, Response
 from werkzeug.utils import secure_filename
 
@@ -109,9 +108,15 @@ def _column_groups(raw_series, event_cols):
     return groups
 
 
-def _normalise(y):
-    denom = y.max() - y.min()
-    return (y - y.min()) / denom if denom != 0 else y * 0
+def _normalise_np(y):
+    """NaN-safe 0-1 normalisation of a numpy array."""
+    if len(y) == 0:
+        return y
+    lo, hi = np.nanmin(y), np.nanmax(y)
+    denom = hi - lo
+    if not np.isfinite(denom) or denom == 0:
+        return np.zeros_like(y)
+    return (y - lo) / denom
 
 
 MAX_PTS_PER_TRACE = 2000
@@ -142,9 +147,14 @@ def _minmax_downsample(xs, ys, max_pts=MAX_PTS_PER_TRACE):
     return xs[sel], ys[sel]
 
 
-def _get_page_groups(df, date_col, period, page, page_size, sort_desc=False):
-    """Group rows by period and materialize ONLY the requested page of groups."""
-    d = df[date_col]
+def _period_index(ds, period):
+    """Cached grouping index for a period. The dataset is date-sorted, so each
+    group is a contiguous positional slice — computed once, then O(1) forever."""
+    cache = ds.setdefault("_period_cache", {})
+    if period in cache:
+        return cache[period]
+
+    d = ds["df"][ds["date_col"]]
     if period == "Weekly":
         year_start = pd.to_datetime(d.dt.year.astype(str) + "-01-01")
         week_num = ((d - year_start).dt.days // 7) + 1
@@ -161,9 +171,23 @@ def _get_page_groups(df, date_col, period, page, page_size, sort_desc=False):
         starts = pd.to_datetime(labels + "-01-01")
         ends = pd.to_datetime(labels + "-12-31 23:59:59")
 
-    # Integer codes per row; uniques come back sorted. No sub-frame is built here.
     codes, uniques = pd.factorize(labels, sort=True)
-    total_groups = len(uniques)
+    # Date-sorted rows + chronologically sortable labels => codes non-decreasing,
+    # so group i occupies positions [bounds[i], bounds[i+1]).
+    bounds = np.searchsorted(codes, np.arange(len(uniques) + 1))
+    firsts = bounds[:-1]
+    starts_np = starts.to_numpy()[firsts]
+    ends_np = ends.to_numpy()[firsts]
+    entry = ([str(u) for u in uniques], bounds,
+             [pd.Timestamp(t) for t in starts_np], [pd.Timestamp(t) for t in ends_np])
+    cache[period] = entry
+    return entry
+
+
+def _get_page_groups(ds, period, page, page_size, sort_desc=False):
+    """Return only the requested page of groups as positional slice bounds."""
+    titles, bounds, g_starts, g_ends = _period_index(ds, period)
+    total_groups = len(titles)
     n_pages = max(1, -(-total_groups // page_size))  # ceil division
     page = max(1, min(page, n_pages))
     start = (page - 1) * page_size
@@ -172,11 +196,8 @@ def _get_page_groups(df, date_col, period, page, page_size, sort_desc=False):
     if sort_desc:
         order.reverse()
 
-    page_groups = []
-    for gi in order[start:start + page_size]:
-        mask = codes == gi
-        page_groups.append((str(uniques[gi]), df.loc[mask],
-                            starts.loc[mask].iloc[0], ends.loc[mask].iloc[0]))
+    page_groups = [(titles[gi], int(bounds[gi]), int(bounds[gi + 1]), g_starts[gi], g_ends[gi])
+                   for gi in order[start:start + page_size]]
     return page_groups, total_groups, n_pages, page
 
 
@@ -196,118 +217,127 @@ def _get_tick_settings(period):
     return None, "%b"
 
 
-def _y_range(df_part, selected_cols, raw_series, event_cols, normalised):
+def _y_range(ds, a, b, selected_cols, normalised):
     vals = []
     for col in selected_cols:
-        if col in event_cols:
+        if col in ds["event_cols"]:
             continue
-        y = raw_series[col].loc[df_part.index]
-        vals.append(_normalise(y) if normalised else y)
+        y = ds["y_np"][col][a:b]
+        y = _normalise_np(y) if normalised else y
+        if len(y):
+            lo, hi = np.nanmin(y), np.nanmax(y)
+            if np.isfinite(lo):
+                vals.append((lo, hi))
     if not vals:
-        return 0, 1
-    all_y = pd.concat(vals).dropna()
-    if all_y.empty:
-        return 0, 1
-    y_min, y_max = all_y.min(), all_y.max()
+        return 0.0, 1.0
+    y_min = min(v[0] for v in vals)
+    y_max = max(v[1] for v in vals)
     if y_min == y_max:
-        return y_min - 1, y_max + 1
+        return float(y_min - 1), float(y_max + 1)
     pad = (y_max - y_min) * 0.05
-    return y_min - pad, y_max + pad
+    return float(y_min - pad), float(y_max + pad)
 
 
-def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
-                     axis_suffix, y_min, y_max, row_idx, color):
-    event_df = df_part[[date_col, col]].dropna()
+def _event_trace(ds, col, a, b, period_start, period_end,
+                 axis_suffix, y_min, y_max, row_idx, color):
+    date_col = ds["date_col"]
+    event_df = ds["df"].iloc[a:b][[date_col, col]].dropna()
     if col != "input_ToU_label":
         event_df = event_df[event_df[col] != 0]
     if event_df.empty:
-        return
+        return None
     xs, ys = [], []
     for t in event_df[date_col]:
         if period_start <= t <= period_end:
-            xs.extend([t, t, None])
+            ts = str(t)
+            xs.extend([ts, ts, None])
             ys.extend([y_min, y_max, None])
-    fig.add_trace(go.Scattergl(
-        x=xs, y=ys, mode="lines", name=col,
-        line=dict(color=color, width=1.5), opacity=0.35,
-        xaxis=f"x{axis_suffix}", yaxis=f"y{axis_suffix}",
-        legendgroup=col, showlegend=(row_idx == 1),
-    ))
+    return {
+        "type": "scattergl", "x": xs, "y": ys, "mode": "lines", "name": col,
+        "line": {"color": color, "width": 1.5}, "opacity": 0.35,
+        "xaxis": f"x{axis_suffix}", "yaxis": f"y{axis_suffix}",
+        "legendgroup": col, "showlegend": row_idx == 1,
+    }
 
 
-def build_figure(df, date_col, raw_series, event_cols, series_colors,
-                 period, normalised, selected_cols, page=1, page_size=10, plot_height=200,
-                 sort_desc=False):
-    fig = go.Figure()
-    page_groups, total_groups, n_pages, page = _get_page_groups(df, date_col, period, page, page_size, sort_desc)
+def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
+                 plot_height=200, sort_desc=False):
+    """Build the figure as a plain dict — no plotly object validation overhead."""
+    page_groups, total_groups, n_pages, page = _get_page_groups(ds, period, page, page_size, sort_desc)
     n_groups = max(1, len(page_groups))
     total_height = max(400, plot_height * n_groups)
     dtick, tickformat = _get_tick_settings(period)
+    series_colors = ds["colors"]
+    event_cols = ds["event_cols"]
+    x_np = ds["x_np"]
+    y_np = ds["y_np"]
 
-    fig.update_layout(
-        height=total_height,
-        margin=dict(l=2, r=5, t=30, b=20), autosize=True,
-        font=dict(size=11),
-        grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.06),
-        legend=dict(orientation="h", x=0, y=1, xanchor="left", yanchor="bottom",
-                    font=dict(size=10), bgcolor="rgba(0,0,0,0)",
-                    xref="container", yref="container"),
-    )
-
+    layout = {
+        "height": total_height,
+        "margin": {"l": 2, "r": 5, "t": 30, "b": 20}, "autosize": True,
+        "font": {"size": 11},
+        "grid": {"rows": n_groups, "columns": 1, "pattern": "independent", "ygap": 0.06},
+        "legend": {"orientation": "h", "x": 0, "y": 1, "xanchor": "left", "yanchor": "bottom",
+                   "font": {"size": 10}, "bgcolor": "rgba(0,0,0,0)",
+                   "xref": "container", "yref": "container"},
+    }
+    data = []
     annotations = []
     # Tight left gutter: title text + room for y tick labels, no extra padding.
-    max_label = max((len(t) for t, _, _, _ in page_groups), default=4)
+    max_label = max((len(t) for t, _, _, _, _ in page_groups), default=4)
     title_frac = min(0.11, 0.0045 * max_label + 0.03)
 
-    for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
+    for row_idx, (title, a, b, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
-        y_min, y_max = _y_range(df_part, selected_cols, raw_series, event_cols, normalised)
+        y_min, y_max = _y_range(ds, a, b, selected_cols, normalised)
 
-        xaxis_settings = dict(
-            anchor=f"y{axis_suffix}",
-            tickfont=dict(size=10), tickangle=0, automargin=True,
-            range=[period_start, period_end], tickformat=tickformat,
-            domain=[title_frac, 1.0],
-        )
+        xaxis_settings = {
+            "anchor": f"y{axis_suffix}",
+            "tickfont": {"size": 10}, "tickangle": 0, "automargin": True,
+            "range": [str(period_start), str(period_end)], "tickformat": tickformat,
+            "domain": [title_frac, 1.0],
+        }
         if dtick is not None:
             xaxis_settings["dtick"] = dtick
-            xaxis_settings["tick0"] = period_start
+            xaxis_settings["tick0"] = str(period_start)
 
-        fig.layout[f"xaxis{axis_suffix}"] = xaxis_settings
-        fig.layout[f"yaxis{axis_suffix}"] = dict(
-            anchor=f"x{axis_suffix}", tickfont=dict(size=10),
-            automargin=True, range=[y_min, y_max],
-        )
+        layout[f"xaxis{axis_suffix}"] = xaxis_settings
+        layout[f"yaxis{axis_suffix}"] = {
+            "anchor": f"x{axis_suffix}", "tickfont": {"size": 10},
+            "automargin": True, "range": [y_min, y_max],
+        }
 
         # Title annotation in the left gutter, vertically centered on its subplot
-        annotations.append(dict(
-            text=f"<b>{title}</b>",
-            xref="paper", yref=f"y{axis_suffix} domain",
-            x=0, y=0.5, xanchor="left", yanchor="middle",
-            font=dict(size=11), showarrow=False,
-        ))
+        annotations.append({
+            "text": f"<b>{title}</b>",
+            "xref": "paper", "yref": f"y{axis_suffix} domain",
+            "x": 0, "y": 0.5, "xanchor": "left", "yanchor": "middle",
+            "font": {"size": 11}, "showarrow": False,
+        })
 
         for col in selected_cols:
+            color = series_colors.get(col, "#636EFA")
             if col in event_cols:
-                _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
-                                 axis_suffix, y_min, y_max, row_idx, series_colors.get(col, "#636EFA"))
+                trace = _event_trace(ds, col, a, b, period_start, period_end,
+                                     axis_suffix, y_min, y_max, row_idx, color)
+                if trace:
+                    data.append(trace)
             else:
-                y = raw_series[col].loc[df_part.index]
-                y_plot = _normalise(y) if normalised else y
-                xs, ys = _minmax_downsample(df_part[date_col].to_numpy(), y_plot.to_numpy(dtype=np.float64))
-                # Pre-render x as second-precision ISO strings and round y: much
-                # smaller JSON and no per-element encoder work at serialize time.
+                y = y_np[col][a:b]
+                y_plot = _normalise_np(y) if normalised else y
+                xs, ys = _minmax_downsample(x_np[a:b], y_plot)
+                # Second-precision ISO strings + rounded y: small JSON, fast dumps.
                 xs = np.datetime_as_string(xs.astype("datetime64[s]"), unit="s").tolist()
                 ys = np.round(ys, 4).tolist()
-                fig.add_trace(go.Scattergl(
-                    x=xs, y=ys, mode="lines", name=col,
-                    line=dict(color=series_colors.get(col, "#636EFA"), width=1),
-                    xaxis=f"x{axis_suffix}", yaxis=f"y{axis_suffix}",
-                    legendgroup=col, showlegend=(row_idx == 1),
-                ))
+                data.append({
+                    "type": "scattergl", "x": xs, "y": ys, "mode": "lines", "name": col,
+                    "line": {"color": color, "width": 1},
+                    "xaxis": f"x{axis_suffix}", "yaxis": f"y{axis_suffix}",
+                    "legendgroup": col, "showlegend": row_idx == 1,
+                })
 
-    fig.update_layout(annotations=annotations)
-    return fig, total_groups, n_pages, page
+    layout["annotations"] = annotations
+    return {"data": data, "layout": layout}, total_groups, n_pages, page
 
 
 # In-memory store keyed by session id
@@ -320,12 +350,18 @@ def _get_dataset(sid):
 
 
 def _set_dataset(sid, df, date_col, event_cols):
+    df = df.sort_values(date_col).reset_index(drop=True)
     raw_series = _prepare_series(df, date_col, event_cols)
     colors = {col: PLOTLY_COLORS[i % len(PLOTLY_COLORS)] for i, col in enumerate(raw_series)}
     groups = _column_groups(raw_series, event_cols)
+    # Precompute numpy views once: figure requests then slice positionally.
+    x_np = df[date_col].to_numpy()
+    y_np = {col: s.to_numpy(dtype=np.float64) for col, s in raw_series.items()
+            if col not in event_cols}
     _datasets[sid] = {
         "df": df, "date_col": date_col, "event_cols": event_cols,
         "raw_series": raw_series, "colors": colors, "groups": groups,
+        "x_np": x_np, "y_np": y_np, "_period_cache": {},
     }
 
 
@@ -463,19 +499,17 @@ def figure():
     plot_height = int(data.get("plot_height", 200))
     sort_desc = bool(data.get("sort_desc", False))
 
-    fig, total_groups, n_pages, current_page = build_figure(
-        ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
-        ds["colors"], period, normalised, selected_cols, page, page_size, plot_height,
+    fig_dict, total_groups, n_pages, current_page = build_figure(
+        ds, period, normalised, selected_cols, page, page_size, plot_height,
         sort_desc,
     )
-    # Single-pass serialization (no to_json -> loads -> dumps round-trip)
-    fig_dict = fig.to_plotly_json()
     fig_dict["_pagination"] = {
         "page": current_page,
         "n_pages": n_pages,
         "total_groups": total_groups,
         "page_size": page_size,
     }
+    # Single-pass serialization; PlotlyJSONEncoder turns NaN into null.
     body = json.dumps(fig_dict, cls=plotly.utils.PlotlyJSONEncoder)
     return Response(body, mimetype="application/json")
 
@@ -789,10 +823,19 @@ def db_upload():
         conn.close()
 
 
+_table_meta_cache = {}  # table -> (timestamp, payload)
+_TABLE_META_TTL = 300
+
+
 @app.route("/api/db/table-meta/<table_name>", methods=["GET"])
 def db_table_meta(table_name):
     """Metadata for the visualizer wizard: date column, columns, months, preview.
     Everything is computed in SQL — no bulk data leaves the database."""
+    import time as _time
+    cached = _table_meta_cache.get(table_name)
+    if cached and _time.time() - cached[0] < _TABLE_META_TTL:
+        return jsonify(cached[1])
+
     conn = _get_db_conn()
     try:
         cur = conn.cursor()
@@ -815,14 +858,22 @@ def db_table_meta(table_name):
 
         columns = [c for c, _ in cols if c != date_col]
 
-        cur.execute(
-            f'SELECT DISTINCT to_char("{date_col}", \'YYYY-MM\') FROM "{table_name}" '
-            f'WHERE "{date_col}" IS NOT NULL ORDER BY 1'
-        )
-        months = [r[0] for r in cur.fetchall()]
+        # min/max via index (fast) instead of a full-table DISTINCT scan
+        cur.execute(f'SELECT min("{date_col}"), max("{date_col}") FROM "{table_name}"')
+        dmin, dmax = cur.fetchone()
+        if dmin is None:
+            months = []
+        else:
+            months = [str(p) for p in pd.period_range(pd.Timestamp(dmin).to_period("M"),
+                                                      pd.Timestamp(dmax).to_period("M"))]
 
-        cur.execute(f'SELECT count(*) FROM "{table_name}"')
-        row_count = cur.fetchone()[0]
+        # Planner row estimate: instant, close enough for display
+        cur.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = %s", (table_name,))
+        est = cur.fetchone()
+        row_count = int(est[0]) if est and est[0] is not None and est[0] >= 0 else None
+        if row_count is None or row_count == 0:
+            cur.execute(f'SELECT count(*) FROM "{table_name}"')
+            row_count = cur.fetchone()[0]
 
         cur.execute(f'SELECT * FROM "{table_name}" ORDER BY "{date_col}" LIMIT 10')
         prev_cols = [d[0] for d in cur.description]
@@ -830,11 +881,13 @@ def db_table_meta(table_name):
             [str(v) if v is not None else None for v in row] for row in cur.fetchall()
         ]
 
-        return jsonify(
+        payload = dict(
             table=table_name, date_col=date_col, columns=columns, months=months,
             row_count=row_count, col_count=len(cols),
             preview={"columns": prev_cols, "data": prev_rows},
         )
+        _table_meta_cache[table_name] = (_time.time(), payload)
+        return jsonify(payload)
     finally:
         conn.close()
 
@@ -889,8 +942,16 @@ def db_ingest():
         where = f'"{date_col}" IS NOT NULL'
         params = []
         if selected_months:
-            where += f' AND to_char("{date_col}", \'YYYY-MM\') = ANY(%s)'
-            params.append(list(selected_months))
+            periods = sorted(pd.Period(m, "M") for m in set(selected_months))
+            contiguous = all((periods[i + 1] - periods[i]).n == 1 for i in range(len(periods) - 1))
+            if contiguous:
+                # Range filter can use an index on the date column
+                where += f' AND "{date_col}" >= %s AND "{date_col}" < %s'
+                params.extend([periods[0].start_time.to_pydatetime(),
+                               (periods[-1] + 1).start_time.to_pydatetime()])
+            else:
+                where += f' AND to_char("{date_col}", \'YYYY-MM\') = ANY(%s)'
+                params.append([str(p) for p in periods])
 
         query = (
             f'SELECT {col_sql} FROM "{table}" WHERE {where} ORDER BY "{date_col}"'
