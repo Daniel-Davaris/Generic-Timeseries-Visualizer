@@ -365,7 +365,7 @@ const DARK_PLOTLY_LAYOUT = {
   yaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
 };
 
-const state = { period: "Yearly", normalised: false, groups: null, scanData: null, currentFile: null, page: 1 };
+const state = { period: "Yearly", normalised: false, groups: null, scanData: null, currentFile: null, page: 1, dbTable: null, dbSelection: null };
 
 // ── IndexedDB for file blob caching ─────────────────────────────────
 const DB_NAME = "signal_analyser_files";
@@ -819,6 +819,28 @@ document.getElementById("btn-ingest").onclick = async function() {
   if (selectedCols.length === 0) { alert("Please select at least one column."); return; }
   if (selectedMonths.length === 0) { alert("Please select at least one date period."); return; }
 
+  // ── DB table mode: ingest directly from PostgreSQL ──
+  if (state.dbTable) {
+    showLoading("Querying database…");
+    fetch("/api/db/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ table: state.dbTable, columns: selectedCols, months: selectedMonths, event_cols: "" }),
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        hideLoading();
+        if (data.error) { alert(data.error); return; }
+        state.groups = data.groups;
+        state.dbSelection = { columns: selectedCols, months: selectedMonths };
+        document.getElementById("row-count").textContent = data.row_count.toLocaleString() + " rows";
+        buildSidebar(data.groups);
+        showView("visualiser");
+      })
+      .catch(function(err) { hideLoading(); alert("Ingest failed: " + err); });
+    return;
+  }
+
   var sid = state.scanData && state.scanData.sid;
 
   // Check if server still has file cached; if not, re-upload from IndexedDB
@@ -999,7 +1021,24 @@ function fetchFigure() {
   showLoading("Generating chart…");
   doFetchFigure(cols).then(function(ok) {
     if (ok === false) {
-      // Server lost cache, re-upload
+      // Server lost the dataset
+      if (state.dbTable && state.dbSelection) {
+        // DB mode: cheap re-ingest straight from PostgreSQL
+        showLoading("Reloading from database…");
+        fetch("/api/db/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ table: state.dbTable, columns: state.dbSelection.columns, months: state.dbSelection.months, event_cols: "" }),
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(ingestData) {
+            if (ingestData.error) { hideLoading(); alert(ingestData.error); return; }
+            state.groups = ingestData.groups;
+            doFetchFigure(cols);
+          });
+        return;
+      }
+      // File mode: re-upload from IndexedDB
       showLoading("Re-uploading file…");
       getFile(state.currentFile).then(function(blob) {
         if (!blob) { hideLoading(); alert("File no longer cached. Please upload again."); return; }
@@ -1122,7 +1161,27 @@ document.getElementById("page-size").addEventListener("change", function() { sta
 document.getElementById("menu-timeseries").onclick = function() { showView("home"); renderHomepage(); };
 
 // ── Init ────────────────────────────────────────────────────────────
-showView("landing");
+// DB table mode: /?dbtable=X opens the wizard sourced from PostgreSQL
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var dbtable = params.get("dbtable");
+  if (!dbtable) { showView("landing"); return; }
+
+  state.dbTable = dbtable;
+  state.currentFile = "db:" + dbtable;
+  showLoading("Reading table metadata…");
+  fetch("/api/db/table-meta/" + encodeURIComponent(dbtable))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      hideLoading();
+      if (data.error) { alert(data.error); showView("landing"); return; }
+      state.scanData = data;
+      var h2 = document.querySelector("#wizard h2");
+      if (h2) h2.innerHTML = '<span class="step-num">⚙</span> ' + dbtable + ' — select columns &amp; date range';
+      showWizardWithRestore(data, null);
+    })
+    .catch(function(err) { hideLoading(); alert("Failed to read table: " + err); showView("landing"); });
+})();
 </script>
 </body>
 </html>

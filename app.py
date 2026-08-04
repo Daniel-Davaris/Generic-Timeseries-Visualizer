@@ -741,6 +741,134 @@ def db_upload():
         conn.close()
 
 
+@app.route("/api/db/table-meta/<table_name>", methods=["GET"])
+def db_table_meta(table_name):
+    """Metadata for the visualizer wizard: date column, columns, months, preview.
+    Everything is computed in SQL — no bulk data leaves the database."""
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name, data_type FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position;
+        """, (table_name,))
+        cols = cur.fetchall()
+        if not cols:
+            return jsonify(error="Table not found"), 404
+
+        date_col = None
+        for name, dtype in cols:
+            if dtype.startswith("timestamp") or dtype == "date":
+                date_col = name
+                break
+        if date_col is None:
+            return jsonify(error="No date/time column found in this table"), 400
+
+        columns = [c for c, _ in cols if c != date_col]
+
+        cur.execute(
+            f'SELECT DISTINCT to_char("{date_col}", \'YYYY-MM\') FROM "{table_name}" '
+            f'WHERE "{date_col}" IS NOT NULL ORDER BY 1'
+        )
+        months = [r[0] for r in cur.fetchall()]
+
+        cur.execute(f'SELECT count(*) FROM "{table_name}"')
+        row_count = cur.fetchone()[0]
+
+        cur.execute(f'SELECT * FROM "{table_name}" ORDER BY "{date_col}" LIMIT 10')
+        prev_cols = [d[0] for d in cur.description]
+        prev_rows = [
+            [str(v) if v is not None else None for v in row] for row in cur.fetchall()
+        ]
+
+        return jsonify(
+            table=table_name, date_col=date_col, columns=columns, months=months,
+            row_count=row_count, col_count=len(cols),
+            preview={"columns": prev_cols, "data": prev_rows},
+        )
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/ingest", methods=["POST"])
+def db_ingest():
+    """Load selected columns/months of a DB table into the visualizer dataset.
+    Streams straight from PostgreSQL COPY into pandas — only the requested
+    subset ever leaves the database."""
+    data = request.get_json(force=True)
+    table = (data.get("table") or "").strip()
+    selected_cols = data.get("columns", [])
+    selected_months = data.get("months", [])
+    event_cols_input = data.get("event_cols", "")
+    event_cols = set(c.strip() for c in event_cols_input.split(",") if c.strip())
+
+    if not table:
+        return jsonify(error="No table specified"), 400
+    if not selected_cols:
+        return jsonify(error="No columns selected"), 400
+
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name, data_type FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+        """, (table,))
+        col_types = dict(cur.fetchall())
+        if not col_types:
+            return jsonify(error="Table not found"), 404
+
+        date_col = None
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+              AND (data_type LIKE 'timestamp%%' OR data_type = 'date')
+            ORDER BY ordinal_position LIMIT 1
+        """, (table,))
+        row = cur.fetchone()
+        if row:
+            date_col = row[0]
+        if date_col is None:
+            return jsonify(error="No date/time column found"), 400
+
+        # Only keep columns that really exist (prevents injection)
+        keep = [c for c in selected_cols if c in col_types and c != date_col]
+        if not keep:
+            return jsonify(error="No valid columns selected"), 400
+
+        col_sql = ", ".join(f'"{c}"' for c in [date_col] + keep)
+        where = f'"{date_col}" IS NOT NULL'
+        params = []
+        if selected_months:
+            where += f' AND to_char("{date_col}", \'YYYY-MM\') = ANY(%s)'
+            params.append(list(selected_months))
+
+        query = (
+            f'SELECT {col_sql} FROM "{table}" WHERE {where} ORDER BY "{date_col}"'
+        )
+        # COPY → CSV buffer → pandas C parser: fastest path out of Postgres
+        buf = io.StringIO()
+        copy_sql = cur.mogrify(query, params).decode()
+        cur.copy_expert(f"COPY ({copy_sql}) TO STDOUT WITH (FORMAT csv, HEADER)", buf)
+        buf.seek(0)
+        df = pd.read_csv(buf, parse_dates=[date_col])
+        del buf
+
+        sid = "db_" + os.urandom(6).hex()
+        session["dataset_id"] = sid
+        _set_dataset(sid, df, date_col, event_cols)
+
+        ds = _get_dataset(sid)
+        return jsonify(
+            sid=sid, groups=ds["groups"], row_count=len(df), col_count=len(df.columns)
+        )
+    except Exception as exc:
+        return jsonify(error=str(exc)), 400
+    finally:
+        conn.close()
+
+
 @app.route("/api/db/export/<table_name>", methods=["GET"])
 def db_export(table_name):
     """Export a table as CSV."""
