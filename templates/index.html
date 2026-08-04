@@ -254,11 +254,6 @@
       <h1 style="font-size:1.6rem;font-weight:700;color:var(--text-primary);margin:0;">Timeseries Intelligence</h1>
       <p style="color:var(--text-muted);font-size:0.9rem;margin:0;">Select a tool to get started</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;width:100%;max-width:600px;margin-top:20px;">
-        <div class="menu-card" id="menu-timeseries">
-          <div class="menu-icon">📈</div>
-          <div class="menu-title">Timeseries Visualizer</div>
-          <div class="menu-desc">Upload and visualize time-based data with interactive charts</div>
-        </div>
         <div class="menu-card" onclick="window.location='/db'">
           <div class="menu-icon">🗄️</div>
           <div class="menu-title">Database Explorer</div>
@@ -1180,7 +1175,6 @@ document.getElementById("page-next").onclick = function() { state.page++; fetchF
 document.getElementById("page-size").addEventListener("change", function() { state.page = 1; fetchFigure(); });
 
 // Menu card click
-document.getElementById("menu-timeseries").onclick = function() { showView("home"); renderHomepage(); };
 
 // ── Init ────────────────────────────────────────────────────────────
 // DB table mode: /?dbtable=X opens the wizard sourced from PostgreSQL

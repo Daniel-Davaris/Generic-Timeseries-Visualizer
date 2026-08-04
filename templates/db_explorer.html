@@ -416,7 +416,7 @@ function selectTable(name) {
   currentTable = name;
   var vbtn = document.getElementById("btn-visualize");
   vbtn.style.display = "inline-block";
-  vbtn.onclick = function() { window.open("/?dbtable=" + encodeURIComponent(name), "_blank"); };
+  vbtn.onclick = function() { window.location = "/?dbtable=" + encodeURIComponent(name); };
   loadSchema(name);
   loadData(name);
 }
