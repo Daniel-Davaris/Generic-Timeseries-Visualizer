@@ -107,6 +107,19 @@
     .upload-status { font-size: 0.75rem; margin-top: 10px; }
     .upload-status.err { color: var(--accent-red); }
     .upload-status.ok { color: var(--accent-green); }
+    .progress-wrap { display: none; margin-top: 12px; }
+    .progress-wrap.visible { display: block; }
+    .progress-track { height: 8px; background: var(--bg-primary); border: 1px solid var(--border);
+                      border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 4px;
+                     transition: width 0.15s ease; }
+    .progress-fill.indeterminate { width: 100% !important; opacity: 0.6;
+                     background: repeating-linear-gradient(45deg, var(--accent), var(--accent) 10px,
+                                 #1f6feb 10px, #1f6feb 20px);
+                     animation: slide 1s linear infinite; }
+    @keyframes slide { from { background-position: 0 0; } to { background-position: 28px 0; } }
+    .progress-label { display: flex; justify-content: space-between; font-size: 0.7rem;
+                      color: var(--text-muted); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -181,6 +194,13 @@
         <option value="replace">Replace (drop &amp; recreate)</option>
         <option value="append">Append rows</option>
       </select>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label">
+          <span id="progress-stage"></span>
+          <span id="progress-detail"></span>
+        </div>
+      </div>
       <div class="upload-status" id="upload-status"></div>
       <div class="modal-actions">
         <button class="btn" id="btn-cancel-upload">Cancel</button>
@@ -357,6 +377,8 @@ function resetUploadForm() {
   document.getElementById("table-name").value = "";
   document.getElementById("upload-status").textContent = "";
   document.getElementById("upload-status").className = "upload-status";
+  hideProgress();
+  document.getElementById("btn-do-upload").disabled = false;
 }
 
 function setUploadFile(f) {
@@ -381,6 +403,28 @@ dropZone.addEventListener("drop", function(e) {
   if (e.dataTransfer.files.length) setUploadFile(e.dataTransfer.files[0]);
 });
 
+function setProgress(pct, stage, detail) {
+  var wrap = document.getElementById("progress-wrap");
+  var fill = document.getElementById("progress-fill");
+  wrap.classList.add("visible");
+  if (pct === null) {
+    fill.classList.add("indeterminate");
+  } else {
+    fill.classList.remove("indeterminate");
+    fill.style.width = pct + "%";
+  }
+  document.getElementById("progress-stage").textContent = stage || "";
+  document.getElementById("progress-detail").textContent = detail || "";
+}
+
+function hideProgress() {
+  var wrap = document.getElementById("progress-wrap");
+  var fill = document.getElementById("progress-fill");
+  wrap.classList.remove("visible");
+  fill.classList.remove("indeterminate");
+  fill.style.width = "0%";
+}
+
 document.getElementById("btn-do-upload").addEventListener("click", function() {
   var status = document.getElementById("upload-status");
   if (!uploadFile) { status.textContent = "Choose a file first."; status.className = "upload-status err"; return; }
@@ -388,38 +432,72 @@ document.getElementById("btn-do-upload").addEventListener("click", function() {
   fd.append("file", uploadFile);
   fd.append("table_name", document.getElementById("table-name").value);
   fd.append("mode", document.getElementById("upload-mode").value);
-  status.textContent = "Uploading & extracting…";
+  status.textContent = "";
   status.className = "upload-status";
+  var btn = document.getElementById("btn-do-upload");
+  btn.disabled = true;
 
-  fetch("/api/db/upload", { method: "POST", body: fd })
-    .then(function(r) {
-      return r.text().then(function(t) {
-        try { return JSON.parse(t); }
-        catch (e) { throw new Error("Server error (HTTP " + r.status + "). The file may be too large or the request timed out."); }
-      });
-    })
-    .then(function(data) {
-      if (data.error) {
-        status.textContent = data.error;
-        status.className = "upload-status err";
-        return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/db/upload");
+  xhr.timeout = 300000;
+
+  xhr.upload.addEventListener("progress", function(e) {
+    if (e.lengthComputable) {
+      var pct = Math.round((e.loaded / e.total) * 100);
+      var mb = function(b) { return (b / 1048576).toFixed(1); };
+      if (pct >= 100) {
+        setProgress(null, "Extracting & loading into database…", mb(e.total) + " MB sent");
+      } else {
+        setProgress(pct, "Uploading… " + pct + "%", mb(e.loaded) + " / " + mb(e.total) + " MB");
       }
-      status.textContent = "✓ Table \"" + data.table + "\" " + data.mode + " — " +
-        data.rows.toLocaleString() + " rows, " + data.columns + " columns.";
-      status.className = "upload-status ok";
-      loadTables();
-      setTimeout(function() {
-        modal.classList.remove("open");
-        resetUploadForm();
-        selectTable(data.table);
-        var item = document.querySelector('.table-item[data-table="' + data.table + '"]');
-        if (item) item.classList.add("active");
-      }, 1200);
-    })
-    .catch(function(err) {
-      status.textContent = String(err);
+    }
+  });
+
+  xhr.addEventListener("load", function() {
+    btn.disabled = false;
+    var data;
+    try { data = JSON.parse(xhr.responseText); }
+    catch (e) {
+      hideProgress();
+      status.textContent = "Server error (HTTP " + xhr.status + "). The file may be too large or the request timed out.";
       status.className = "upload-status err";
-    });
+      return;
+    }
+    if (data.error) {
+      hideProgress();
+      status.textContent = data.error;
+      status.className = "upload-status err";
+      return;
+    }
+    setProgress(100, "Done", "");
+    status.textContent = "✓ Table \"" + data.table + "\" " + data.mode + " — " +
+      data.rows.toLocaleString() + " rows, " + data.columns + " columns.";
+    status.className = "upload-status ok";
+    loadTables();
+    setTimeout(function() {
+      modal.classList.remove("open");
+      resetUploadForm();
+      selectTable(data.table);
+      var item = document.querySelector('.table-item[data-table="' + data.table + '"]');
+      if (item) item.classList.add("active");
+    }, 1200);
+  });
+
+  xhr.addEventListener("error", function() {
+    btn.disabled = false;
+    hideProgress();
+    status.textContent = "Network error during upload.";
+    status.className = "upload-status err";
+  });
+
+  xhr.addEventListener("timeout", function() {
+    btn.disabled = false;
+    hideProgress();
+    status.textContent = "Upload timed out after 5 minutes.";
+    status.className = "upload-status err";
+  });
+
+  xhr.send(fd);
 });
 
 // Init
