@@ -4,6 +4,7 @@ import csv
 import io
 
 import pandas as pd
+import numpy as np
 import plotly
 import plotly.graph_objs as go
 from flask import Flask, render_template, request, jsonify, session, Response
@@ -111,6 +112,34 @@ def _column_groups(raw_series, event_cols):
 def _normalise(y):
     denom = y.max() - y.min()
     return (y - y.min()) / denom if denom != 0 else y * 0
+
+
+MAX_PTS_PER_TRACE = 2000
+
+
+def _minmax_downsample(xs, ys, max_pts=MAX_PTS_PER_TRACE):
+    """Keep the min and max of each bin so spikes survive; caps payload size."""
+    n = len(ys)
+    if n <= max_pts:
+        return xs, ys
+    nbins = max_pts // 2
+    edges = np.linspace(0, n, nbins + 1, dtype=np.int64)
+    sel = np.empty(nbins * 2, dtype=np.int64)
+    for i in range(nbins):
+        a, b = edges[i], edges[i + 1]
+        if b <= a:
+            b = a + 1
+        seg = ys[a:b]
+        try:
+            lo = a + np.nanargmin(seg)
+            hi = a + np.nanargmax(seg)
+        except ValueError:  # all-NaN bin
+            lo = hi = a
+        if lo > hi:
+            lo, hi = hi, lo
+        sel[2 * i] = lo
+        sel[2 * i + 1] = hi
+    return xs[sel], ys[sel]
 
 
 def _get_page_groups(df, date_col, period, page, page_size, sort_desc=False):
@@ -265,8 +294,13 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
             else:
                 y = raw_series[col].loc[df_part.index]
                 y_plot = _normalise(y) if normalised else y
+                xs, ys = _minmax_downsample(df_part[date_col].to_numpy(), y_plot.to_numpy(dtype=np.float64))
+                # Pre-render x as second-precision ISO strings and round y: much
+                # smaller JSON and no per-element encoder work at serialize time.
+                xs = np.datetime_as_string(xs.astype("datetime64[s]"), unit="s").tolist()
+                ys = np.round(ys, 4).tolist()
                 fig.add_trace(go.Scattergl(
-                    x=df_part[date_col], y=y_plot, mode="lines", name=col,
+                    x=xs, y=ys, mode="lines", name=col,
                     line=dict(color=series_colors.get(col, "#636EFA"), width=1),
                     xaxis=f"x{axis_suffix}", yaxis=f"y{axis_suffix}",
                     legendgroup=col, showlegend=(row_idx == 1),
@@ -434,15 +468,16 @@ def figure():
         ds["colors"], period, normalised, selected_cols, page, page_size, plot_height,
         sort_desc,
     )
-    # Serialize figure and add pagination metadata
-    fig_json = json.loads(plotly.io.to_json(fig))
-    fig_json["_pagination"] = {
+    # Single-pass serialization (no to_json -> loads -> dumps round-trip)
+    fig_dict = fig.to_plotly_json()
+    fig_dict["_pagination"] = {
         "page": current_page,
         "n_pages": n_pages,
         "total_groups": total_groups,
         "page_size": page_size,
     }
-    return Response(json.dumps(fig_json), mimetype="application/json")
+    body = json.dumps(fig_dict, cls=plotly.utils.PlotlyJSONEncoder)
+    return Response(body, mimetype="application/json")
 
 
 # ══════════════════════════════════════════════════════════════════════

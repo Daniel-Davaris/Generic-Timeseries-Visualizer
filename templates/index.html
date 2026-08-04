@@ -1253,7 +1253,8 @@ function doFetchFigure(cols) {
       chartDiv.innerHTML = "";
       var figHeight = layout.height || 500;
       layout.height = Math.max(500, figHeight);
-      Plotly.newPlot(chartDiv, fig.data, layout, { responsive: false });
+      layout.hovermode = false;
+      Plotly.newPlot(chartDiv, fig.data, layout, { staticPlot: true, responsive: false });
     })
     .catch(function(err) { hideLoading(); console.error("Figure fetch failed:", err); });
 }
