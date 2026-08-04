@@ -23,8 +23,12 @@
                          text-transform: uppercase; letter-spacing: 1px; }
 
     .layout { display: flex; height: calc(100vh - 45px); }
-    .sidebar { width: 240px; border-right: 1px solid var(--border); overflow-y: auto;
-               background: var(--bg-secondary); padding: 8px; flex-shrink: 0; }
+    .sidebar { width: 240px; min-width: 120px; max-width: 600px; border-right: 1px solid var(--border);
+               overflow-y: auto; background: var(--bg-secondary); padding: 8px; flex-shrink: 0;
+               position: relative; }
+    .sidebar-resize { position: absolute; top: 0; right: -3px; width: 8px; height: 100%;
+                      cursor: col-resize; z-index: 10; }
+    .sidebar-resize:hover, .sidebar-resize.active { background: var(--accent); opacity: 0.3; }
     .sidebar h3 { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);
                   letter-spacing: 0.5px; margin-bottom: 6px; padding: 4px; }
     .table-item { padding: 6px 8px; border-radius: 4px; cursor: pointer; display: flex;
@@ -167,6 +171,7 @@
       <h3>Tables</h3>
       <button class="btn btn-upload" id="btn-open-upload">⬆ Upload New Table</button>
       <div id="table-list"><span style="color:var(--text-muted);font-size:.8rem;">Loading…</span></div>
+      <div class="sidebar-resize" id="sidebar-resize"></div>
     </div>
 
     <div class="main-panel">
@@ -704,6 +709,37 @@ document.getElementById("btn-do-upload").addEventListener("click", function() {
 
   xhr.send(fd);
 });
+
+// Sidebar drag-to-resize (matches the visualiser columns sidebar)
+(function() {
+  var handle = document.getElementById("sidebar-resize");
+  var sidebar = document.getElementById("sidebar");
+  var saved = parseInt(localStorage.getItem("dbx_sidebar_width"), 10);
+  if (saved && saved >= 120 && saved <= 600) sidebar.style.width = saved + "px";
+  var startX, startWidth;
+  handle.addEventListener("mousedown", function(e) {
+    e.preventDefault();
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    handle.classList.add("active");
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onDrag);
+    document.addEventListener("mouseup", onUp);
+  });
+  function onDrag(e) {
+    var newWidth = startWidth + (e.clientX - startX);
+    if (newWidth < 120) newWidth = 120;
+    if (newWidth > 600) newWidth = 600;
+    sidebar.style.width = newWidth + "px";
+  }
+  function onUp() {
+    handle.classList.remove("active");
+    document.body.style.userSelect = "";
+    localStorage.setItem("dbx_sidebar_width", sidebar.offsetWidth);
+    document.removeEventListener("mousemove", onDrag);
+    document.removeEventListener("mouseup", onUp);
+  }
+})();
 
 // Init
 loadTables();
