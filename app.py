@@ -281,9 +281,9 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
     total_height = max(400, plot_height * n_groups)
     # Vertical gap between subplots: must clear the upper plot's x-axis tick labels
     # AND the lower plot's top y-axis tick label (automargin only pads paper edges,
-    # not the space between interior rows). ~22px clears both at font size 10.
-    _avail_h = max(1, total_height - 50)  # minus top/bottom margins
-    ygap = min(0.5, 22.0 / _avail_h)
+    # not interior rows). grid.ygap is a fraction of the CELL height, so scale by
+    # plot_height to get ~22px, enough to clear both label rows at font size 10.
+    ygap = min(0.6, 22.0 / max(1, plot_height))
     dtick, tickformat = _get_tick_settings(period)
     series_colors = ds["colors"]
     event_cols = ds["event_cols"]
