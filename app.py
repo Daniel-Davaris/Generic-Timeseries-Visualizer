@@ -292,7 +292,7 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
 
     layout = {
         "height": total_height,
-        "margin": {"l": 2, "r": 5, "t": 30, "b": 20}, "autosize": True,
+        "margin": {"l": 2, "r": 0, "t": 30, "b": 20}, "autosize": True,
         "font": {"size": 11},
         "grid": {"rows": n_groups, "columns": 1, "pattern": "independent", "ygap": ygap},
         "legend": {"orientation": "h", "x": 0, "y": 1, "xanchor": "left", "yanchor": "bottom",
