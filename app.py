@@ -119,31 +119,34 @@ def _normalise_np(y):
     return (y - lo) / denom
 
 
-MAX_PTS_PER_TRACE = 2000
+MAX_PTS_PER_TRACE = 1200
 
 
 def _minmax_downsample(xs, ys, max_pts=MAX_PTS_PER_TRACE):
-    """Keep the min and max of each bin so spikes survive; caps payload size."""
+    """Keep the min and max of each bin so spikes survive; fully vectorized."""
     n = len(ys)
     if n <= max_pts:
         return xs, ys
     nbins = max_pts // 2
-    edges = np.linspace(0, n, nbins + 1, dtype=np.int64)
+    k = -(-n // nbins)  # ceil: points per bin
+    pad = nbins * k - n
+    ymat = np.append(ys, np.full(pad, np.nan)).reshape(nbins, k)
+    nan_mask = np.isnan(ymat)
+    all_nan = nan_mask.all(axis=1)
+    lo = np.argmin(np.where(nan_mask, np.inf, ymat), axis=1)
+    hi = np.argmax(np.where(nan_mask, -np.inf, ymat), axis=1)
+    base = np.arange(nbins, dtype=np.int64) * k
+    lo_idx = base + lo
+    hi_idx = base + hi
+    lo_idx[all_nan] = base[all_nan]
+    hi_idx[all_nan] = base[all_nan]
+    np.minimum(lo_idx, n - 1, out=lo_idx)
+    np.minimum(hi_idx, n - 1, out=hi_idx)
+    first = np.minimum(lo_idx, hi_idx)
+    second = np.maximum(lo_idx, hi_idx)
     sel = np.empty(nbins * 2, dtype=np.int64)
-    for i in range(nbins):
-        a, b = edges[i], edges[i + 1]
-        if b <= a:
-            b = a + 1
-        seg = ys[a:b]
-        try:
-            lo = a + np.nanargmin(seg)
-            hi = a + np.nanargmax(seg)
-        except ValueError:  # all-NaN bin
-            lo = hi = a
-        if lo > hi:
-            lo, hi = hi, lo
-        sel[2 * i] = lo
-        sel[2 * i + 1] = hi
+    sel[0::2] = first
+    sel[1::2] = second
     return xs[sel], ys[sel]
 
 
