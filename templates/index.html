@@ -1268,6 +1268,10 @@ function doFetchFigure(cols) {
       var figHeight = layout.height || 500;
       layout.height = Math.max(500, figHeight);
       layout.hovermode = false;
+      // Fill the container exactly — otherwise autosize can measure short and
+      // leave an empty gap on the right edge of the plot.
+      layout.width = chartDiv.clientWidth;
+      layout.autosize = false;
       Plotly.newPlot(chartDiv, fig.data, layout, { staticPlot: true, responsive: false });
     })
     .catch(function(err) { hideLoading(); console.error("Figure fetch failed:", err); });
