@@ -41,6 +41,11 @@
     .app-header .logo-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex;
                             align-items: center; border-radius: 6px; transition: transform 0.15s; }
     .app-header .logo-btn:hover { transform: scale(1.1); }
+    .app-header .back-btn { background: none; border: 1px solid var(--border); color: var(--text-muted);
+                            cursor: pointer; border-radius: 6px; padding: 1px 8px; font-size: 0.75rem;
+                            display: flex; align-items: center; gap: 4px; transition: all 0.15s; }
+    .app-header .back-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+    .app-header .nav-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
     .app-header .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; text-transform: uppercase;
                             letter-spacing: 1px; }
 
@@ -229,6 +234,8 @@
         <circle cx="16" cy="7" r="2" fill="#0d1117"/>
       </svg>
     </button>
+    <button id="btn-back" class="back-btn hidden" title="Back">&#8592; Back</button>
+    <span id="nav-title" class="nav-title hidden">Timeseries Visualiser</span>
     <span class="subtitle">Timeseries Intelligence</span>
   </div>
 
@@ -436,7 +443,12 @@ function showView(view) {
   document.getElementById("wizard").classList.toggle("hidden", view !== "wizard");
   document.getElementById("toolbar").classList.toggle("hidden", view !== "visualiser");
   document.getElementById("main-area").classList.toggle("hidden", view !== "visualiser");
+  var onVizPage = (view !== "landing");
+  document.getElementById("btn-back").classList.toggle("hidden", !onVizPage);
+  document.getElementById("nav-title").classList.toggle("hidden", !onVizPage);
+  currentView = view;
 }
+var currentView = "landing";
 
 function showLoading(msg) {
   document.getElementById("loading-text").textContent = msg;
@@ -1010,6 +1022,16 @@ document.getElementById("btn-edit-selection").onclick = () => {
 
 // Home button
 document.getElementById("btn-home").onclick = function() { showView("landing"); };
+document.getElementById("btn-back").onclick = function() {
+  if (currentView === "visualiser") {
+    showView("wizard");
+  } else if (currentView === "wizard") {
+    if (state.dbTable) { window.location = "/db"; }
+    else { showView("home"); renderHomepage(); }
+  } else {
+    showView("landing");
+  }
+};
 
 // ── Fetch figure ────────────────────────────────────────────────────
 function getSelectedCols() {
