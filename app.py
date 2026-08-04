@@ -1018,6 +1018,34 @@ def db_export(table_name):
         conn.close()
 
 
+@app.route("/api/db/table/<table_name>", methods=["DELETE"])
+def db_drop_table(table_name):
+    """Drop a table and remove any group assignment."""
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name=%s",
+            (table_name,),
+        )
+        if not cur.fetchone():
+            return jsonify(error="Table not found"), 404
+        if table_name == "_table_groups":
+            return jsonify(error="Cannot delete this table"), 400
+
+        cur.execute(f'DROP TABLE "{table_name}"')
+        cur.execute("DELETE FROM _table_groups WHERE table_name = %s", (table_name,))
+        conn.commit()
+        _table_meta_cache.pop(table_name, None)
+        return jsonify(ok=True, table=table_name)
+    except Exception as exc:
+        conn.rollback()
+        return jsonify(error=str(exc)), 400
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     import os as _os
     debug = _os.environ.get("FLASK_DEBUG", "1") == "1"

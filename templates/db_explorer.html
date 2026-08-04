@@ -39,6 +39,10 @@
                             cursor: pointer; font-size: 0.75rem; padding: 0 4px; flex-shrink: 0; }
     .table-item:hover .move-btn { display: inline; }
     .table-item .move-btn:hover { color: var(--accent); }
+    .table-item .del-btn { display: none; background: none; border: none; color: var(--text-muted);
+                           cursor: pointer; font-size: 0.75rem; padding: 0 4px; flex-shrink: 0; }
+    .table-item:hover .del-btn { display: inline; }
+    .table-item .del-btn:hover { color: #f85149; }
 
     .group-header { display: flex; align-items: center; gap: 5px; padding: 6px 4px 3px;
                     font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
@@ -280,6 +284,7 @@ function loadTables() {
           s += '<div class="table-item" data-table="' + t.name + '">' +
                '<span class="tbl-name" title="' + t.name + '">' + t.name + '</span>' +
                '<button class="move-btn" title="Move to group" data-table="' + t.name + '">⇄</button>' +
+               '<button class="del-btn" title="Delete table" data-table="' + t.name + '">🗑</button>' +
                '<span class="row-count">' + (t.row_count || 0).toLocaleString() + '</span></div>';
         });
         return s;
@@ -325,6 +330,7 @@ function loadTables() {
       list.querySelectorAll(".table-item").forEach(function(item) {
         item.addEventListener("click", function(e) {
           if (e.target.classList.contains("move-btn")) return;
+          if (e.target.classList.contains("del-btn")) return;
           list.querySelectorAll(".table-item").forEach(function(i) { i.classList.remove("active"); });
           item.classList.add("active");
           selectTable(item.dataset.table);
@@ -338,7 +344,39 @@ function loadTables() {
           openGroupMenu(btn.dataset.table, e.clientX, e.clientY);
         });
       });
+
+      // Delete table
+      list.querySelectorAll(".del-btn").forEach(function(btn) {
+        btn.addEventListener("click", function(e) {
+          e.stopPropagation();
+          deleteTable(btn.dataset.table);
+        });
+      });
     });
+}
+
+function deleteTable(table) {
+  if (!confirm('Delete table "' + table + '"? This permanently drops it from the database and cannot be undone.')) return;
+  fetch("/api/db/table/" + encodeURIComponent(table), { method: "DELETE" })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { alert("Delete failed: " + (res.d.error || "unknown error")); return; }
+      if (currentTable === table) {
+        currentTable = null;
+        var vbtn = document.getElementById("btn-visualize");
+        if (vbtn) vbtn.style.display = "none";
+        var st = document.getElementById("schema-table");
+        if (st) st.style.display = "none";
+        var se = document.getElementById("schema-empty");
+        if (se) se.style.display = "flex";
+        var dt = document.getElementById("data-table");
+        if (dt) dt.style.display = "none";
+        var de = document.getElementById("data-empty");
+        if (de) de.style.display = "flex";
+      }
+      loadTables();
+    })
+    .catch(function(err) { alert("Delete failed: " + err); });
 }
 
 function existingGroupNames() {
