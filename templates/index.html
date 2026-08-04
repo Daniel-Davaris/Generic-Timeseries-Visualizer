@@ -1268,11 +1268,14 @@ function doFetchFigure(cols) {
       var figHeight = layout.height || 500;
       layout.height = Math.max(500, figHeight);
       layout.hovermode = false;
-      // Fill the container exactly — otherwise autosize can measure short and
-      // leave an empty gap on the right edge of the plot.
-      layout.width = chartDiv.clientWidth;
-      layout.autosize = false;
-      Plotly.newPlot(chartDiv, fig.data, layout, { staticPlot: true, responsive: false });
+      layout.autosize = true;
+      delete layout.width;
+      Plotly.newPlot(chartDiv, fig.data, layout, { staticPlot: true, responsive: false })
+        .then(function() {
+          // Re-measure after the (tall) chart has settled the page scrollbar,
+          // so the figure fills the final container width with no right-edge gap.
+          Plotly.relayout(chartDiv, { width: chartDiv.clientWidth });
+        });
     })
     .catch(function(err) { hideLoading(); console.error("Figure fetch failed:", err); });
 }
