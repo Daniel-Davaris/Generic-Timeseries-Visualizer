@@ -453,6 +453,7 @@ function saveViewSettings() {
   const e = entries.find(x => x.filename === state.currentFile);
   if (!e) return;
   e.view = captureViewSettings();
+  if (state.colors) e.colors = Object.assign({}, e.colors || {}, state.colors);
   saveMemory(entries);
 }
 function applyViewSettings(v) {
@@ -1036,6 +1037,8 @@ function buildSidebar(groups) {
       cb.type = "checkbox"; cb.value = cols[i]; cb.name = "col";
       cb.addEventListener("change", fetchFigure);
       var sw = document.createElement("span");
+      sw.className = "col-swatch";
+      sw.dataset.col = cols[i];
       sw.style.cssText = "display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 4px;vertical-align:-1px;flex-shrink:0;background:" +
         ((state.colors && state.colors[cols[i]]) || "var(--border)");
       lbl.append(cb, sw, " " + cols[i]);
@@ -1176,6 +1179,18 @@ function doFetchFigure(cols) {
         document.getElementById("page-next").disabled = pag.page >= pag.n_pages;
       } else {
         pagCtrl.style.display = "none";
+      }
+      // Sync sidebar swatches with the actual plotted trace colors
+      var traceColors = {};
+      (fig.data || []).forEach(function(t) {
+        if (t.name && t.line && t.line.color) traceColors[t.name] = t.line.color;
+      });
+      if (Object.keys(traceColors).length) {
+        state.colors = Object.assign({}, state.colors || {}, traceColors);
+        document.querySelectorAll("#sidebar .col-swatch").forEach(function(sw) {
+          var c = state.colors[sw.dataset.col];
+          if (c) sw.style.background = c;
+        });
       }
       saveViewSettings();
 
