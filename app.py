@@ -279,6 +279,9 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
     page_groups, total_groups, n_pages, page = _get_page_groups(ds, period, page, page_size, sort_desc)
     n_groups = max(1, len(page_groups))
     total_height = max(400, plot_height * n_groups)
+    # ~5px vertical gap between subplots, expressed as a fraction of the plotting area
+    _avail_h = max(1, total_height - 50)  # minus top/bottom margins
+    ygap = min(0.5, 5.0 / _avail_h)
     dtick, tickformat = _get_tick_settings(period)
     series_colors = ds["colors"]
     event_cols = ds["event_cols"]
@@ -289,7 +292,7 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
         "height": total_height,
         "margin": {"l": 2, "r": 5, "t": 30, "b": 20}, "autosize": True,
         "font": {"size": 11},
-        "grid": {"rows": n_groups, "columns": 1, "pattern": "independent", "ygap": 0.06},
+        "grid": {"rows": n_groups, "columns": 1, "pattern": "independent", "ygap": ygap},
         "legend": {"orientation": "h", "x": 0, "y": 1, "xanchor": "left", "yanchor": "bottom",
                    "font": {"size": 10}, "bgcolor": "rgba(0,0,0,0)",
                    "xref": "container", "yref": "container"},
