@@ -212,7 +212,7 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
 
     fig.update_layout(
         height=total_height,
-        margin=dict(l=30, r=5, t=30, b=20), autosize=True,
+        margin=dict(l=2, r=5, t=30, b=20), autosize=True,
         font=dict(size=11),
         grid=dict(rows=n_groups, columns=1, pattern="independent", ygap=0.06),
         legend=dict(orientation="h", x=0, y=1, xanchor="left", yanchor="bottom",
@@ -221,9 +221,9 @@ def build_figure(df, date_col, raw_series, event_cols, series_colors,
     )
 
     annotations = []
-    # Reserve a left gutter for the group titles; plots start where the title ends.
+    # Tight left gutter: title text + room for y tick labels, no extra padding.
     max_label = max((len(t) for t, _, _, _ in page_groups), default=4)
-    title_frac = min(0.15, 0.010 * max_label + 0.010)
+    title_frac = min(0.11, 0.0045 * max_label + 0.03)
 
     for row_idx, (title, df_part, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
