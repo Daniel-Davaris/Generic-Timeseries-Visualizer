@@ -1089,7 +1089,8 @@ document.getElementById("btn-edit-selection").onclick = () => {
 document.getElementById("btn-home").onclick = function() { showView("landing"); };
 document.getElementById("btn-back").onclick = function() {
   if (currentView === "visualiser") {
-    showView("wizard");
+    if (state.dbTable) { window.location = "/db"; }
+    else { showView("wizard"); }
   } else if (currentView === "wizard") {
     if (state.dbTable) { window.location = "/db"; }
     else { showView("home"); renderHomepage(); }
