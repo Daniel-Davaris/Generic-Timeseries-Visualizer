@@ -328,7 +328,7 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
             "font": {"size": 11, "color": "#ffffff",
                      "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"},
             "showarrow": False,
-            "bgcolor": "#1158c7", "borderpad": 3,
+            "bgcolor": "#000000", "borderpad": 3,
         })
 
         for col in selected_cols:
