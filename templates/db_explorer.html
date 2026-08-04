@@ -300,7 +300,12 @@ function runQuery() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql: sql })
   })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      return r.text().then(function(t) {
+        try { return JSON.parse(t); }
+        catch (e) { throw new Error("Server error (HTTP " + r.status + "). The query may have timed out."); }
+      });
+    })
     .then(function(data) {
       var elapsed = ((Date.now() - start) / 1000).toFixed(2);
       if (data.error) {
@@ -387,7 +392,12 @@ document.getElementById("btn-do-upload").addEventListener("click", function() {
   status.className = "upload-status";
 
   fetch("/api/db/upload", { method: "POST", body: fd })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      return r.text().then(function(t) {
+        try { return JSON.parse(t); }
+        catch (e) { throw new Error("Server error (HTTP " + r.status + "). The file may be too large or the request timed out."); }
+      });
+    })
     .then(function(data) {
       if (data.error) {
         status.textContent = data.error;
