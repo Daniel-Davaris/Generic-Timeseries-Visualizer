@@ -323,7 +323,7 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
             "xref": f"x{axis_suffix} domain", "yref": f"y{axis_suffix} domain",
             "x": 0, "y": 1, "xanchor": "left", "yanchor": "top",
             "font": {"size": 11, "color": "#ffffff"}, "showarrow": False,
-            "bgcolor": "#1f6feb", "borderpad": 3,
+            "bgcolor": "#1158c7", "borderpad": 3,
         })
 
         for col in selected_cols:
