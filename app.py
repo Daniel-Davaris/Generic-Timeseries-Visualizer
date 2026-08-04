@@ -319,10 +319,12 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
 
         # Title label inside the plot, pinned to the top-left corner with a blue chip
         annotations.append({
-            "text": f"<b>{title}</b>",
+            "text": f"{title}",
             "xref": f"x{axis_suffix} domain", "yref": f"y{axis_suffix} domain",
             "x": 0, "y": 1, "xanchor": "left", "yanchor": "top",
-            "font": {"size": 11, "color": "#ffffff"}, "showarrow": False,
+            "font": {"size": 11, "color": "#ffffff",
+                     "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"},
+            "showarrow": False,
             "bgcolor": "#1158c7", "borderpad": 3,
         })
 
