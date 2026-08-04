@@ -460,24 +460,73 @@ def serve_catalogue():
         content = f.read()
     return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
 
+def _ensure_groups_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS _table_groups (
+            table_name TEXT PRIMARY KEY,
+            group_name TEXT NOT NULL
+        )
+    """)
+
+
 @app.route("/api/db/tables", methods=["GET"])
 def db_tables():
-    """List all tables with row counts and column info."""
+    """List all tables with row counts and group assignments."""
     conn = _get_db_conn()
     try:
         cur = conn.cursor()
+        _ensure_groups_table(cur)
+        conn.commit()
         cur.execute("""
             SELECT t.table_name,
-                   pg_stat_user_tables.n_live_tup as row_count
+                   pg_stat_user_tables.n_live_tup as row_count,
+                   g.group_name
             FROM information_schema.tables t
             LEFT JOIN pg_stat_user_tables ON pg_stat_user_tables.relname = t.table_name
+            LEFT JOIN _table_groups g ON g.table_name = t.table_name
             WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+              AND t.table_name <> '_table_groups'
             ORDER BY t.table_name;
         """)
         tables = []
         for row in cur.fetchall():
-            tables.append({"name": row[0], "row_count": row[1] or 0})
+            tables.append({"name": row[0], "row_count": row[1] or 0, "group": row[2]})
         return jsonify(tables=tables)
+    finally:
+        conn.close()
+
+
+@app.route("/api/db/table-group", methods=["POST"])
+def db_set_table_group():
+    """Assign a table to a group (empty/null group removes the assignment)."""
+    data = request.get_json(force=True)
+    table = (data.get("table") or "").strip()
+    group = (data.get("group") or "").strip()
+    if not table:
+        return jsonify(error="No table specified"), 400
+
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        _ensure_groups_table(cur)
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+            (table,),
+        )
+        if not cur.fetchone():
+            return jsonify(error="Table not found"), 404
+        if group:
+            cur.execute("""
+                INSERT INTO _table_groups (table_name, group_name) VALUES (%s, %s)
+                ON CONFLICT (table_name) DO UPDATE SET group_name = EXCLUDED.group_name
+            """, (table, group))
+        else:
+            cur.execute("DELETE FROM _table_groups WHERE table_name = %s", (table,))
+        conn.commit()
+        return jsonify(table=table, group=group or None)
+    except Exception as exc:
+        conn.rollback()
+        return jsonify(error=str(exc)), 400
     finally:
         conn.close()
 

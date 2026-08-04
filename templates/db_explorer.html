@@ -28,11 +28,33 @@
                   letter-spacing: 0.5px; margin-bottom: 6px; padding: 4px; }
     .table-item { padding: 6px 8px; border-radius: 4px; cursor: pointer; display: flex;
                   justify-content: space-between; align-items: center; font-size: 0.8rem;
-                  color: var(--text-secondary); transition: all 0.1s; }
+                  color: var(--text-secondary); transition: all 0.1s; position: relative; }
     .table-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .table-item.active { background: var(--bg-tertiary); color: var(--accent); border-left: 2px solid var(--accent); }
     .table-item .row-count { font-size: 0.65rem; color: var(--text-muted); background: var(--bg-primary);
                              padding: 1px 5px; border-radius: 8px; }
+    .table-item .tbl-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .table-item .move-btn { display: none; background: none; border: none; color: var(--text-muted);
+                            cursor: pointer; font-size: 0.75rem; padding: 0 4px; flex-shrink: 0; }
+    .table-item:hover .move-btn { display: inline; }
+    .table-item .move-btn:hover { color: var(--accent); }
+
+    .group-header { display: flex; align-items: center; gap: 5px; padding: 6px 4px 3px;
+                    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
+                    color: var(--text-muted); cursor: pointer; user-select: none; margin-top: 6px; }
+    .group-header:hover { color: var(--text-primary); }
+    .group-header .arrow { font-size: 0.6rem; transition: transform 0.15s; }
+    .group-header.collapsed .arrow { transform: rotate(-90deg); }
+    .group-header .g-count { margin-left: auto; font-size: 0.65rem; }
+    .group-body.hidden { display: none; }
+
+    .group-menu { position: fixed; z-index: 300; background: var(--bg-secondary);
+                  border: 1px solid var(--border); border-radius: 6px; padding: 4px;
+                  min-width: 160px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+    .group-menu .gm-item { padding: 6px 10px; font-size: 0.78rem; color: var(--text-secondary);
+                           border-radius: 4px; cursor: pointer; }
+    .group-menu .gm-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .group-menu .gm-sep { border-top: 1px solid var(--border); margin: 4px 0; }
 
     .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
@@ -222,7 +244,10 @@ document.querySelectorAll(".tab").forEach(function(tab) {
   });
 });
 
-// Load tables
+// Load tables (grouped)
+var allTables = [];
+var collapsedGroups = JSON.parse(localStorage.getItem("dbx_collapsed") || "{}");
+
 function loadTables() {
   fetch("/api/db/tables")
     .then(function(r) { return r.json(); })
@@ -232,20 +257,156 @@ function loadTables() {
         list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem;padding:8px;">No tables found</span>';
         return;
       }
-      var html = "";
+      allTables = data.tables;
+
+      // Bucket tables by group
+      var groups = {};
+      var ungrouped = [];
       data.tables.forEach(function(t) {
-        html += '<div class="table-item" data-table="' + t.name + '">' +
-                '<span>' + t.name + '</span>' +
-                '<span class="row-count">' + (t.row_count || 0).toLocaleString() + ' rows</span></div>';
+        if (t.group) {
+          (groups[t.group] = groups[t.group] || []).push(t);
+        } else {
+          ungrouped.push(t);
+        }
       });
+
+      var html = "";
+      function renderItems(tables) {
+        var s = "";
+        tables.forEach(function(t) {
+          s += '<div class="table-item" data-table="' + t.name + '">' +
+               '<span class="tbl-name" title="' + t.name + '">' + t.name + '</span>' +
+               '<button class="move-btn" title="Move to group" data-table="' + t.name + '">⇄</button>' +
+               '<span class="row-count">' + (t.row_count || 0).toLocaleString() + '</span></div>';
+        });
+        return s;
+      }
+
+      Object.keys(groups).sort().forEach(function(g) {
+        var collapsed = collapsedGroups[g] ? " collapsed" : "";
+        var bodyHidden = collapsedGroups[g] ? " hidden" : "";
+        html += '<div class="group-header' + collapsed + '" data-group="' + g + '">' +
+                '<span class="arrow">▼</span><span>' + g + '</span>' +
+                '<span class="g-count">' + groups[g].length + '</span></div>' +
+                '<div class="group-body' + bodyHidden + '" data-group-body="' + g + '">' +
+                renderItems(groups[g]) + '</div>';
+      });
+
+      if (ungrouped.length) {
+        var g = "__ungrouped__";
+        var collapsed = collapsedGroups[g] ? " collapsed" : "";
+        var bodyHidden = collapsedGroups[g] ? " hidden" : "";
+        var label = Object.keys(groups).length ? "Ungrouped" : "All tables";
+        html += '<div class="group-header' + collapsed + '" data-group="' + g + '">' +
+                '<span class="arrow">▼</span><span>' + label + '</span>' +
+                '<span class="g-count">' + ungrouped.length + '</span></div>' +
+                '<div class="group-body' + bodyHidden + '" data-group-body="' + g + '">' +
+                renderItems(ungrouped) + '</div>';
+      }
+
       list.innerHTML = html;
+
+      // Collapse/expand
+      list.querySelectorAll(".group-header").forEach(function(h) {
+        h.addEventListener("click", function() {
+          var g = h.dataset.group;
+          var body = list.querySelector('[data-group-body="' + g + '"]');
+          var isCollapsed = h.classList.toggle("collapsed");
+          body.classList.toggle("hidden", isCollapsed);
+          collapsedGroups[g] = isCollapsed;
+          localStorage.setItem("dbx_collapsed", JSON.stringify(collapsedGroups));
+        });
+      });
+
+      // Select table
       list.querySelectorAll(".table-item").forEach(function(item) {
-        item.addEventListener("click", function() {
+        item.addEventListener("click", function(e) {
+          if (e.target.classList.contains("move-btn")) return;
           list.querySelectorAll(".table-item").forEach(function(i) { i.classList.remove("active"); });
           item.classList.add("active");
           selectTable(item.dataset.table);
         });
       });
+
+      // Move-to-group menu
+      list.querySelectorAll(".move-btn").forEach(function(btn) {
+        btn.addEventListener("click", function(e) {
+          e.stopPropagation();
+          openGroupMenu(btn.dataset.table, e.clientX, e.clientY);
+        });
+      });
+    });
+}
+
+function existingGroupNames() {
+  var names = {};
+  allTables.forEach(function(t) { if (t.group) names[t.group] = true; });
+  return Object.keys(names).sort();
+}
+
+function closeGroupMenu() {
+  var m = document.getElementById("group-menu");
+  if (m) m.remove();
+}
+
+function openGroupMenu(table, x, y) {
+  closeGroupMenu();
+  var menu = document.createElement("div");
+  menu.className = "group-menu";
+  menu.id = "group-menu";
+  var current = null;
+  allTables.forEach(function(t) { if (t.name === table) current = t.group; });
+
+  var html = '<div class="gm-item" data-action="new">＋ New group…</div>';
+  var names = existingGroupNames();
+  if (names.length) html += '<div class="gm-sep"></div>';
+  names.forEach(function(g) {
+    html += '<div class="gm-item" data-group="' + g + '">' + (g === current ? "✓ " : "") + g + '</div>';
+  });
+  if (current) {
+    html += '<div class="gm-sep"></div><div class="gm-item" data-action="remove">✕ Remove from group</div>';
+  }
+  menu.innerHTML = html;
+  document.body.appendChild(menu);
+
+  // Keep on screen
+  var rect = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, window.innerWidth - rect.width - 8) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - rect.height - 8) + "px";
+
+  menu.querySelectorAll(".gm-item").forEach(function(mi) {
+    mi.addEventListener("click", function() {
+      var group;
+      if (mi.dataset.action === "new") {
+        group = prompt("New group name:");
+        if (!group) { closeGroupMenu(); return; }
+      } else if (mi.dataset.action === "remove") {
+        group = "";
+      } else {
+        group = mi.dataset.group;
+      }
+      assignGroup(table, group);
+      closeGroupMenu();
+    });
+  });
+
+  setTimeout(function() {
+    document.addEventListener("click", function handler(e) {
+      if (!menu.contains(e.target)) { closeGroupMenu(); document.removeEventListener("click", handler); }
+    });
+  }, 0);
+}
+
+function assignGroup(table, group) {
+  fetch("/api/db/table-group", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ table: table, group: group })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      loadTables();
     });
 }
 
