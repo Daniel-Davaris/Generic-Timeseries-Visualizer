@@ -296,9 +296,6 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
     }
     data = []
     annotations = []
-    # Tight left gutter: title text + room for y tick labels, no extra padding.
-    max_label = max((len(t) for t, _, _, _, _ in page_groups), default=4)
-    title_frac = min(0.11, 0.0045 * max_label + 0.03)
 
     for row_idx, (title, a, b, period_start, period_end) in enumerate(page_groups, start=1):
         axis_suffix = "" if row_idx == 1 else str(row_idx)
@@ -308,7 +305,7 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
             "anchor": f"y{axis_suffix}",
             "tickfont": {"size": 10}, "tickangle": 0, "automargin": True,
             "range": [str(period_start), str(period_end)], "tickformat": tickformat,
-            "domain": [title_frac, 1.0],
+            "domain": [0.0, 1.0],
         }
         if dtick is not None:
             xaxis_settings["dtick"] = dtick
@@ -320,12 +317,13 @@ def build_figure(ds, period, normalised, selected_cols, page=1, page_size=10,
             "automargin": True, "range": [y_min, y_max],
         }
 
-        # Title annotation in the left gutter, vertically centered on its subplot
+        # Title label inside the plot, pinned to the top-left corner with a blue chip
         annotations.append({
             "text": f"<b>{title}</b>",
-            "xref": "paper", "yref": f"y{axis_suffix} domain",
-            "x": 0, "y": 0.5, "xanchor": "left", "yanchor": "middle",
-            "font": {"size": 11}, "showarrow": False,
+            "xref": f"x{axis_suffix} domain", "yref": f"y{axis_suffix} domain",
+            "x": 0, "y": 1, "xanchor": "left", "yanchor": "top",
+            "font": {"size": 11, "color": "#ffffff"}, "showarrow": False,
+            "bgcolor": "#1f6feb", "borderpad": 3,
         })
 
         for col in selected_cols:
