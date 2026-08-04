@@ -1272,9 +1272,11 @@ function doFetchFigure(cols) {
       delete layout.width;
       Plotly.newPlot(chartDiv, fig.data, layout, { staticPlot: true, responsive: false })
         .then(function() {
-          // Re-measure after the (tall) chart has settled the page scrollbar,
-          // so the figure fills the final container width with no right-edge gap.
-          Plotly.relayout(chartDiv, { width: chartDiv.clientWidth });
+          // Defer past the scrollbar reflow so clientWidth is final, otherwise
+          // the figure fills a stale (narrower) width and leaves a right-edge gap.
+          setTimeout(function() {
+            Plotly.relayout(chartDiv, { width: chartDiv.clientWidth });
+          }, 60);
         });
     })
     .catch(function(err) { hideLoading(); console.error("Figure fetch failed:", err); });
