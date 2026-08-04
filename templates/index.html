@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Signal Analyser</title>
+  <title>ALPHA-9</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231c2128'/><polyline points='4,24 10,18 16,21 22,10 28,14' fill='none' stroke='%2358a6ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
   <style>
@@ -236,7 +236,7 @@
     </button>
     <button id="btn-back" class="back-btn hidden" title="Back">&#8592; Back</button>
     <span id="nav-title" class="nav-title hidden">Timeseries Visualiser</span>
-    <span class="subtitle">Timeseries Intelligence</span>
+    <span class="subtitle">ALPHA-9</span>
   </div>
 
   <!-- Loading overlay -->
@@ -251,7 +251,14 @@
   <!-- ═══ LANDING PAGE ═══ -->
   <div id="landing">
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px;">
-      <h1 style="font-size:1.6rem;font-weight:700;color:var(--text-primary);margin:0;">Timeseries Intelligence</h1>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <rect width="24" height="24" rx="5" fill="#f0883e"/>
+          <polyline points="4,16 8,10 12,14 16,7 20,12" stroke="#0d1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="16" cy="7" r="2" fill="#0d1117"/>
+        </svg>
+        <h1 style="font-size:1.8rem;font-weight:700;color:var(--text-primary);margin:0;letter-spacing:2px;">ALPHA-9</h1>
+      </div>
       <p style="color:var(--text-muted);font-size:0.9rem;margin:0;">Select a tool to get started</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;width:100%;max-width:600px;margin-top:20px;">
         <div class="menu-card" onclick="window.location='/db'">
