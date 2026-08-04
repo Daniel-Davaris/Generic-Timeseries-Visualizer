@@ -113,7 +113,7 @@ def _normalise(y):
     return (y - y.min()) / denom if denom != 0 else y * 0
 
 
-def _get_page_groups(df, date_col, period, page, page_size):
+def _get_page_groups(df, date_col, period, page, page_size, sort_desc=False):
     """Group rows by period and materialize ONLY the requested page of groups."""
     d = df[date_col]
     if period == "Weekly":
@@ -139,8 +139,12 @@ def _get_page_groups(df, date_col, period, page, page_size):
     page = max(1, min(page, n_pages))
     start = (page - 1) * page_size
 
+    order = list(range(total_groups))
+    if sort_desc:
+        order.reverse()
+
     page_groups = []
-    for gi in range(start, min(start + page_size, total_groups)):
+    for gi in order[start:start + page_size]:
         mask = codes == gi
         page_groups.append((str(uniques[gi]), df.loc[mask],
                             starts.loc[mask].iloc[0], ends.loc[mask].iloc[0]))
@@ -203,9 +207,10 @@ def _add_event_lines(fig, col, df_part, date_col, period_start, period_end,
 
 
 def build_figure(df, date_col, raw_series, event_cols, series_colors,
-                 period, normalised, selected_cols, page=1, page_size=10, plot_height=200):
+                 period, normalised, selected_cols, page=1, page_size=10, plot_height=200,
+                 sort_desc=False):
     fig = go.Figure()
-    page_groups, total_groups, n_pages, page = _get_page_groups(df, date_col, period, page, page_size)
+    page_groups, total_groups, n_pages, page = _get_page_groups(df, date_col, period, page, page_size, sort_desc)
     n_groups = max(1, len(page_groups))
     total_height = max(400, plot_height * n_groups)
     dtick, tickformat = _get_tick_settings(period)
@@ -388,7 +393,7 @@ def ingest():
     _set_dataset(sid, df, date_col, event_cols)
 
     ds = _get_dataset(sid)
-    return jsonify(groups=ds["groups"], row_count=len(df), col_count=len(df.columns))
+    return jsonify(groups=ds["groups"], colors=ds["colors"], row_count=len(df), col_count=len(df.columns))
 
 
 @app.route("/api/check-cache", methods=["POST"])
@@ -422,10 +427,12 @@ def figure():
     page = int(data.get("page", 1))
     page_size = int(data.get("page_size", 10))
     plot_height = int(data.get("plot_height", 200))
+    sort_desc = bool(data.get("sort_desc", False))
 
     fig, total_groups, n_pages, current_page = build_figure(
         ds["df"], ds["date_col"], ds["raw_series"], ds["event_cols"],
         ds["colors"], period, normalised, selected_cols, page, page_size, plot_height,
+        sort_desc,
     )
     # Serialize figure and add pagination metadata
     fig_json = json.loads(plotly.io.to_json(fig))
@@ -867,7 +874,7 @@ def db_ingest():
 
         ds = _get_dataset(sid)
         return jsonify(
-            sid=sid, groups=ds["groups"], row_count=len(df), col_count=len(df.columns)
+            sid=sid, groups=ds["groups"], colors=ds["colors"], row_count=len(df), col_count=len(df.columns)
         )
     except Exception as exc:
         return jsonify(error=str(exc)), 400
