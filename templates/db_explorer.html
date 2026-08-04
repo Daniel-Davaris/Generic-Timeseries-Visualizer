@@ -84,6 +84,29 @@
 
     .empty-state { display: flex; align-items: center; justify-content: center; height: 100%;
                    color: var(--text-muted); font-size: 0.9rem; }
+
+    /* Upload modal */
+    .btn-upload { width: 100%; margin-bottom: 8px; text-align: center; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+                     z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
+             padding: 20px; width: 420px; max-width: 90vw; }
+    .modal h2 { font-size: 0.95rem; margin-bottom: 14px; }
+    .modal label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin: 10px 0 4px; }
+    .modal input[type="text"], .modal select {
+      width: 100%; padding: 7px 10px; font-size: 0.8rem; background: var(--bg-primary);
+      color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; outline: none; }
+    .modal input[type="text"]:focus, .modal select:focus { border-color: var(--accent); }
+    .drop-zone { border: 1px dashed var(--border); border-radius: 6px; padding: 18px;
+                 text-align: center; font-size: 0.8rem; color: var(--text-muted); cursor: pointer;
+                 transition: all 0.15s; }
+    .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); color: var(--accent); }
+    .drop-zone.has-file { border-style: solid; border-color: var(--accent-green); color: var(--accent-green); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .upload-status { font-size: 0.75rem; margin-top: 10px; }
+    .upload-status.err { color: var(--accent-red); }
+    .upload-status.ok { color: var(--accent-green); }
   </style>
 </head>
 <body>
@@ -102,6 +125,7 @@
   <div class="layout">
     <div class="sidebar" id="sidebar">
       <h3>Tables</h3>
+      <button class="btn btn-upload" id="btn-open-upload">⬆ Upload New Table</button>
       <div id="table-list"><span style="color:var(--text-muted);font-size:.8rem;">Loading…</span></div>
     </div>
 
@@ -138,6 +162,29 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload modal -->
+  <div class="modal-overlay" id="upload-modal">
+    <div class="modal">
+      <h2>Upload New Table</h2>
+      <div class="drop-zone" id="drop-zone">Click or drop a file here<br>
+        <span style="font-size:0.7rem;">CSV, TSV, Excel, Parquet or JSON</span></div>
+      <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xlsx,.xls,.parquet,.parq,.json" style="display:none;">
+      <label for="table-name">Table name</label>
+      <input type="text" id="table-name" placeholder="my_table">
+      <label for="upload-mode">If table exists</label>
+      <select id="upload-mode">
+        <option value="fail">Fail (don't overwrite)</option>
+        <option value="replace">Replace (drop &amp; recreate)</option>
+        <option value="append">Append rows</option>
+      </select>
+      <div class="upload-status" id="upload-status"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-upload">Cancel</button>
+        <button class="btn btn-run" id="btn-do-upload">Upload &amp; Create</button>
       </div>
     </div>
   </div>
@@ -279,6 +326,91 @@ function runQuery() {
       errDiv.innerHTML = '<div class="sql-error">' + err + '</div>';
     });
 }
+
+// Upload new table
+var uploadFile = null;
+var modal = document.getElementById("upload-modal");
+var dropZone = document.getElementById("drop-zone");
+var fileInput = document.getElementById("file-input");
+
+document.getElementById("btn-open-upload").addEventListener("click", function() {
+  modal.classList.add("open");
+});
+document.getElementById("btn-cancel-upload").addEventListener("click", function() {
+  modal.classList.remove("open");
+  resetUploadForm();
+});
+modal.addEventListener("click", function(e) {
+  if (e.target === modal) { modal.classList.remove("open"); resetUploadForm(); }
+});
+
+function resetUploadForm() {
+  uploadFile = null;
+  fileInput.value = "";
+  dropZone.classList.remove("has-file");
+  dropZone.innerHTML = 'Click or drop a file here<br><span style="font-size:0.7rem;">CSV, TSV, Excel, Parquet or JSON</span>';
+  document.getElementById("table-name").value = "";
+  document.getElementById("upload-status").textContent = "";
+  document.getElementById("upload-status").className = "upload-status";
+}
+
+function setUploadFile(f) {
+  uploadFile = f;
+  dropZone.classList.add("has-file");
+  dropZone.textContent = f.name + " (" + (f.size / 1048576).toFixed(1) + " MB)";
+  var nameField = document.getElementById("table-name");
+  if (!nameField.value) {
+    nameField.value = f.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase();
+  }
+}
+
+dropZone.addEventListener("click", function() { fileInput.click(); });
+fileInput.addEventListener("change", function() {
+  if (fileInput.files.length) setUploadFile(fileInput.files[0]);
+});
+dropZone.addEventListener("dragover", function(e) { e.preventDefault(); dropZone.classList.add("drag"); });
+dropZone.addEventListener("dragleave", function() { dropZone.classList.remove("drag"); });
+dropZone.addEventListener("drop", function(e) {
+  e.preventDefault();
+  dropZone.classList.remove("drag");
+  if (e.dataTransfer.files.length) setUploadFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById("btn-do-upload").addEventListener("click", function() {
+  var status = document.getElementById("upload-status");
+  if (!uploadFile) { status.textContent = "Choose a file first."; status.className = "upload-status err"; return; }
+  var fd = new FormData();
+  fd.append("file", uploadFile);
+  fd.append("table_name", document.getElementById("table-name").value);
+  fd.append("mode", document.getElementById("upload-mode").value);
+  status.textContent = "Uploading & extracting…";
+  status.className = "upload-status";
+
+  fetch("/api/db/upload", { method: "POST", body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        status.textContent = data.error;
+        status.className = "upload-status err";
+        return;
+      }
+      status.textContent = "✓ Table \"" + data.table + "\" " + data.mode + " — " +
+        data.rows.toLocaleString() + " rows, " + data.columns + " columns.";
+      status.className = "upload-status ok";
+      loadTables();
+      setTimeout(function() {
+        modal.classList.remove("open");
+        resetUploadForm();
+        selectTable(data.table);
+        var item = document.querySelector('.table-item[data-table="' + data.table + '"]');
+        if (item) item.classList.add("active");
+      }, 1200);
+    })
+    .catch(function(err) {
+      status.textContent = String(err);
+      status.className = "upload-status err";
+    });
+});
 
 // Init
 loadTables();

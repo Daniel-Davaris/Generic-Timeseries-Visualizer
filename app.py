@@ -557,6 +557,141 @@ def db_query():
         conn.close()
 
 
+import re as _re
+
+def _pg_ident(name, prefix="col"):
+    """Sanitize an identifier for PostgreSQL: lowercase, alnum + underscore."""
+    s = _re.sub(r"[^a-zA-Z0-9]+", "_", str(name)).strip("_").lower()
+    if not s or s[0].isdigit():
+        s = f"{prefix}_{s}"
+    return s[:63]
+
+
+def _pg_type_for_dtype(dtype):
+    if pd.api.types.is_datetime64_any_dtype(dtype):
+        return "TIMESTAMP"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "BIGINT"
+    if pd.api.types.is_float_dtype(dtype):
+        return "DOUBLE PRECISION"
+    if pd.api.types.is_bool_dtype(dtype):
+        return "BOOLEAN"
+    return "TEXT"
+
+
+@app.route("/api/db/upload", methods=["POST"])
+def db_upload():
+    """Create a new table from an uploaded file (CSV / Excel / Parquet / JSON)."""
+    file = request.files.get("file")
+    if not file:
+        return jsonify(error="No file provided"), 400
+
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    allowed = {".csv", ".tsv", ".txt", ".parquet", ".parq", ".xlsx", ".xls", ".json"}
+    if ext not in allowed:
+        return jsonify(error=f"Unsupported file type. Allowed: {', '.join(sorted(allowed))}"), 400
+
+    mode = request.form.get("mode", "fail")  # fail | replace | append
+    if mode not in ("fail", "replace", "append"):
+        return jsonify(error="mode must be fail, replace or append"), 400
+
+    raw_name = request.form.get("table_name") or os.path.splitext(filename)[0]
+    table = _pg_ident(raw_name, prefix="t")
+    if not table:
+        return jsonify(error="Invalid table name"), 400
+
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(path)
+
+    try:
+        if ext in (".csv", ".txt"):
+            df = pd.read_csv(path)
+        elif ext == ".tsv":
+            df = pd.read_csv(path, sep="\t")
+        elif ext in (".parquet", ".parq"):
+            df = pd.read_parquet(path)
+        elif ext in (".xlsx", ".xls"):
+            df = pd.read_excel(path)
+        else:  # .json
+            df = pd.read_json(path)
+    except Exception as exc:
+        return jsonify(error=f"Could not read file: {exc}"), 400
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    if df.empty or len(df.columns) == 0:
+        return jsonify(error="File contains no data"), 400
+    if len(df.columns) > 1500:
+        return jsonify(error=f"Too many columns ({len(df.columns)}). Max 1500."), 400
+
+    # Try to parse object columns that look like dates
+    for c in df.columns:
+        if df[c].dtype == object:
+            try:
+                parsed = pd.to_datetime(df[c], errors="raise", format="mixed")
+                df[c] = parsed
+            except Exception:
+                pass
+
+    # Sanitized, deduped column names
+    cols, seen = [], {}
+    for c in df.columns:
+        s = _pg_ident(c)
+        if s in seen:
+            seen[s] += 1
+            s = f"{s}_{seen[s]}"
+        else:
+            seen[s] = 0
+        cols.append(s)
+    df.columns = cols
+
+    conn = _get_db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+            (table,),
+        )
+        exists = cur.fetchone() is not None
+
+        if exists and mode == "fail":
+            return jsonify(error=f'Table "{table}" already exists. Choose replace or append.'), 409
+        if exists and mode == "replace":
+            cur.execute(f'DROP TABLE "{table}" CASCADE')
+            exists = False
+
+        if not exists:
+            cols_sql = ", ".join(
+                f'"{c}" {_pg_type_for_dtype(df[c].dtype)}' for c in df.columns
+            )
+            cur.execute(f'CREATE TABLE "{table}" ({cols_sql})')
+
+        buf = io.StringIO()
+        df.to_csv(buf, sep="\t", header=False, index=False, na_rep="\\N")
+        buf.seek(0)
+        quoted = ", ".join(f'"{c}"' for c in df.columns)
+        cur.copy_expert(
+            f"COPY \"{table}\" ({quoted}) FROM STDIN WITH (FORMAT csv, DELIMITER E'\t', NULL '\\N')",
+            buf,
+        )
+        conn.commit()
+        return jsonify(
+            table=table,
+            rows=len(df),
+            columns=len(df.columns),
+            mode="appended" if (exists and mode == "append") else "created",
+        )
+    except Exception as exc:
+        conn.rollback()
+        return jsonify(error=str(exc)), 400
+    finally:
+        conn.close()
+
+
 @app.route("/api/db/export/<table_name>", methods=["GET"])
 def db_export(table_name):
     """Export a table as CSV."""
